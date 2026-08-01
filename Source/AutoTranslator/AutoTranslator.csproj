@@ -16,6 +16,11 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
 
+  <!-- Debug 默认开启日志；Release 不定义符号，编译为空操作，发布即全局关闭日志 -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DefineConstants>$(DefineConstants);AUTOTRANSLATOR_LOGGING</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- 本机引用：RimWorld 核心 / UnityEngine / Harmony（不进仓库，引用本机路径） -->
     <Reference Include="Assembly-CSharp">
@@ -34,6 +39,8 @@
       <HintPath>C:\Application\steam\steamapps\workshop\content\294100\2009463077\Current\Assemblies\0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- net472 需显式引用 System.Net.Http 才能使用 HttpClient 等类型 -->
+    <Reference Include="System.Net.Http" />
   </ItemGroup>
 
 </Project>

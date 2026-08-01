@@ -2,4 +2,10 @@
 <LanguageData>
   <!-- 存放软件自身翻译key -->
   <AutoTranslator.SettingsCategory>自动翻译</AutoTranslator.SettingsCategory>
+  <AutoTranslator.ActiveLanguage>当前语言：{0}</AutoTranslator.ActiveLanguage>
+  <AutoTranslator.DefaultLanguage>默认语言：{0}</AutoTranslator.DefaultLanguage>
+  <AutoTranslator.EnableKeyRecording>记录未翻译的翻译键</AutoTranslator.EnableKeyRecording>
+  <AutoTranslator.Volcengine>火山引擎</AutoTranslator.Volcengine>
+  <AutoTranslator.Baidu>百度翻译</AutoTranslator.Baidu>
+  <AutoTranslator.Aliyun>阿里云翻译</AutoTranslator.Aliyun>
 </LanguageData>

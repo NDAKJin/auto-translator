@@ -1,7 +1,8 @@
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>
-/// 模组全局常量。命名空间、packageId、Harmony owner id 三者统一为同一个字符串。
+/// 模组基础设施常量（跨模块共享的全局标识）。
+/// 业务相关的翻译键名、持久化键名等就近定义在使用它们的类中，避免单一大文件膨胀。
 /// </summary>
 public static class AutoTranslatorConstants
 {

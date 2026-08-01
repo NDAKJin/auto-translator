@@ -10,19 +10,50 @@ namespace nomadicooer.AutoTranslator;
 /// </summary>
 public class AutoTranslatorMod : Mod
 {
+    /// <summary>
+    /// 模组实例（供静态上下文访问设置）。
+    /// </summary>
+    public static AutoTranslatorMod Instance { get; private set; }
+
+    private readonly AutoTranslatorSettings settings;
+
+    /// <summary>
+    /// 是否启用翻译键记录（供 TranslationPatch 在静态上下文读取）。
+    /// </summary>
+    public static bool KeyRecordingEnabled => Instance?.settings.EnableKeyRecording ?? true;
+
     public AutoTranslatorMod(ModContentPack content) : base(content)
     {
-        // 后续在此读取/绑定设置（Settings）。
-        Log.Message("[AutoTranslator] 已加载。");
+        Instance = this;
+        settings = GetSettings<AutoTranslatorSettings>();
+        Logger.Message("已加载。");
     }
 
     public override string SettingsCategory()
     {
-        return (AutoTranslatorConstants.TranslationKeyPrefix + "SettingsCategory").Translate();
+        return AutoTranslatorSettings.SettingsCategoryKey.Translate();
     }
 
     public override void DoSettingsWindowContents(UnityEngine.Rect inRect)
     {
-        // 后续在此绘制设置页（源/目标语言、翻译引擎、API 密钥等）。
+        var listing = new Listing_Standard();
+        listing.Begin(inRect);
+
+        // 当前激活语言（只读显示）
+        listing.Label(
+            AutoTranslatorSettings.ActiveLanguageKey.Translate(
+                LanguageDatabase.activeLanguage?.DisplayName ?? "—"));
+
+        // 默认语言（只读显示）
+        listing.Label(
+            AutoTranslatorSettings.DefaultLanguageKey.Translate(
+                LanguageDatabase.defaultLanguage?.DisplayName ?? "—"));
+
+        // 是否启用翻译键记录
+        listing.CheckboxLabeled(
+            AutoTranslatorSettings.EnableKeyRecordingKey.Translate(),
+            ref settings.EnableKeyRecording);
+
+        listing.End();
     }
 }

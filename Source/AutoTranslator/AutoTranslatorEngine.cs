@@ -7,6 +7,8 @@ namespace nomadicooer.AutoTranslator;
 /// </summary>
 public static class AutoTranslatorEngine
 {
+    
+
     /// <summary>
     /// 尝试翻译给定 key/文本。翻译成功返回译文，失败返回 null 或原文。
     /// </summary>

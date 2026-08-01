@@ -27,6 +27,7 @@ public static class TranslationPatch
     public static void TryTranslatePostfix(string key, ref TaggedString result, ref bool __result)
     {
         if (__result || key == null
+            || !AutoTranslatorMod.KeyRecordingEnabled
             || LanguageDatabase.activeLanguage == null
             || LanguageDatabase.activeLanguage == LanguageDatabase.defaultLanguage)
         {
@@ -72,7 +73,7 @@ public static class TranslationPatch
         }
         catch (System.Exception ex)
         {
-            Log.Warning("[AutoTranslator] 写入 auto.xml 失败: " + ex.Message);
+            Logger.Warning("写入 auto.xml 失败: " + ex.Message);
         }
     }
 }

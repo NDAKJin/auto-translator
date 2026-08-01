@@ -121,4 +121,8 @@ Press button to change filter state.</PLMWTT_StoneOrderTooltip>
   <PLOPT_ShowDebugTileIdToolTip>Show the Debug Tile ID for the highlighted tiles.</PLOPT_ShowDebugTileIdToolTip>
   <PLOPT_BypassTileHighlighterMaximumToolTip>Allow highlighting more than {0} tiles.</PLOPT_BypassTileHighlighterMaximumToolTip>
   <PLOPT_BypassTileHighlighterMaximum>Bypass Tile Highlighter Maximum</PLOPT_BypassTileHighlighterMaximum>
+  <PLGOPT_DisableWorldDataTitle>Disable World Data</PLGOPT_DisableWorldDataTitle>
+  <PLGOPT_DisableWorldDataDescription>Allow disabling World Data:
+World Data are various data used by PrepareLanding to display information about the world.If set, this removes the information, saves some memory and some CPU cycles.
+In return less information is available.</PLGOPT_DisableWorldDataDescription>
 </LanguageData>
