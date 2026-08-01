@@ -29,17 +29,25 @@ public static class AutoTranslatorStartup
         if (settings != null)
         {
             var sources = new List<TranslatePlatform>();
-            if (!string.IsNullOrEmpty(settings.VolcengineAccessKey) && !string.IsNullOrEmpty(settings.VolcengineSecretKey))
+            foreach (PlatformCredential cred in settings.Credentials)
             {
-                sources.Add(new VolcengineTranslate(settings.VolcengineAccessKey, settings.VolcengineSecretKey));
-            }
-            if (!string.IsNullOrEmpty(settings.AliyunAccessKeyId) && !string.IsNullOrEmpty(settings.AliyunAccessKeySecret))
-            {
-                sources.Add(new AliyunTranslate(settings.AliyunAccessKeyId, settings.AliyunAccessKeySecret));
-            }
-            if (!string.IsNullOrEmpty(settings.BaiduAppId) && !string.IsNullOrEmpty(settings.BaiduSecretKey))
-            {
-                sources.Add(new BaiduTranslate(settings.BaiduAppId, settings.BaiduSecretKey));
+                if (string.IsNullOrEmpty(cred.AccessKey) || string.IsNullOrEmpty(cred.SecretKey))
+                {
+                    continue; // 凭据不完整则跳过
+                }
+
+                switch (cred.PlatformId)
+                {
+                    case "Volcengine":
+                        sources.Add(new VolcengineTranslate(cred.AccessKey, cred.SecretKey));
+                        break;
+                    case "Aliyun":
+                        sources.Add(new AliyunTranslate(cred.AccessKey, cred.SecretKey));
+                        break;
+                    case "Baidu":
+                        sources.Add(new BaiduTranslate(cred.AccessKey, cred.SecretKey));
+                        break;
+                }
             }
 
             if (sources.Count > 0)

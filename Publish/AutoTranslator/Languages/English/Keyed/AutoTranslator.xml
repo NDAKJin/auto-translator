@@ -15,4 +15,8 @@
   <AutoTranslator.Volcengine>Volcengine</AutoTranslator.Volcengine>
   <AutoTranslator.Baidu>Baidu</AutoTranslator.Baidu>
   <AutoTranslator.Aliyun>Aliyun</AutoTranslator.Aliyun>
+  <AutoTranslator.PlatformList>Available platforms</AutoTranslator.PlatformList>
+  <AutoTranslator.CredentialTable>Credentials</AutoTranslator.CredentialTable>
+  <AutoTranslator.AccessKey>Access key</AutoTranslator.AccessKey>
+  <AutoTranslator.SecretKey>Secret key</AutoTranslator.SecretKey>
 </LanguageData>

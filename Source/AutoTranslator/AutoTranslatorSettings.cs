@@ -1,14 +1,55 @@
+using System.Collections.Generic;
+using System.Linq;
 using RimWorld;
 using Verse;
 
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>
+/// 翻译平台凭据：一个平台对应一条记录（AccessKey / SecretKey）。
+/// 列表形式存储，支持在设置页动态增删启用的平台。
+/// </summary>
+public class PlatformCredential
+{
+    /// <summary>平台标识：Volcengine / Aliyun / Baidu。</summary>
+    public string PlatformId;
+
+    /// <summary>访问键（阿里云 AccessKeyId / 百度 APP ID / 火山 AccessKey）。</summary>
+    public string AccessKey;
+
+    /// <summary>密钥（各平台 SecretKey）。</summary>
+    public string SecretKey;
+
+    /// <summary>RimWorld 序列化入口，元素级持久化。</summary>
+    public void ExposeData()
+    {
+        Scribe_Values.Look(ref PlatformId, "platformId");
+        Scribe_Values.Look(ref AccessKey, "accessKey");
+        Scribe_Values.Look(ref SecretKey, "secretKey");
+    }
+}
+
+/// <summary>
 /// 模组设置。当前语言与默认语言为只读显示，不持久化；
-/// 仅"是否启用翻译键记录"需要保存。
+/// 翻译平台凭据以列表形式保存，支持在设置页启用/配置多个平台。
 /// </summary>
 public class AutoTranslatorSettings : ModSettings
 {
+    /// <summary>支持的翻译平台标识集合（顺序即为设置页列表顺序）。</summary>
+    public static readonly IReadOnlyList<string> PlatformIds = new[]
+    {
+        "Volcengine",
+        "Aliyun",
+        "Baidu"
+    };
+
+    /// <summary>各平台在设置页显示的翻译键名（key 为 PlatformId）。</summary>
+    public static readonly IReadOnlyDictionary<string, string> PlatformLabelKeys = new Dictionary<string, string>
+    {
+        { "Volcengine", AutoTranslatorConstants.TranslationKeyPrefix + "Platform.Volcengine" },
+        { "Aliyun", AutoTranslatorConstants.TranslationKeyPrefix + "Platform.Aliyun" },
+        { "Baidu", AutoTranslatorConstants.TranslationKeyPrefix + "Platform.Baidu" }
+    };
     /// <summary>
     /// 是否在翻译失败时记录未翻译的 key 到当前语言包的 auto.xml。
     /// </summary>
@@ -56,105 +97,62 @@ public class AutoTranslatorSettings : ModSettings
     public const string EnableRealtimeUpdateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableRealtimeUpdate";
 
     /// <summary>
-    /// 设置页"火山引擎 AccessKey"文本框的翻译键名。
+    /// 设置页"可用平台"列表标题的翻译键名。
     /// </summary>
-    public const string VolcengineAccessKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "VolcengineAccessKey";
+    public const string PlatformListHeaderKey = AutoTranslatorConstants.TranslationKeyPrefix + "PlatformList";
 
     /// <summary>
-    /// 设置页"火山引擎 SecretKey"文本框的翻译键名。
+    /// 设置页"凭据"表格标题的翻译键名。
     /// </summary>
-    public const string VolcengineSecretKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "VolcengineSecretKey";
+    public const string CredentialTableHeaderKey = AutoTranslatorConstants.TranslationKeyPrefix + "CredentialTable";
 
     /// <summary>
-    /// 设置页"阿里云 AccessKeyId"文本框的翻译键名。
+    /// 设置页凭据表格"访问键"列头的翻译键名。
     /// </summary>
-    public const string AliyunAccessKeyIdLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "AliyunAccessKeyId";
+    public const string AccessKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "AccessKey";
 
     /// <summary>
-    /// 设置页"阿里云 AccessKeySecret"文本框的翻译键名。
+    /// 设置页凭据表格"密钥"列头的翻译键名。
     /// </summary>
-    public const string AliyunAccessKeySecretLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "AliyunAccessKeySecret";
+    public const string SecretKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "SecretKey";
 
     /// <summary>
-    /// 设置页"百度 APP ID"文本框的翻译键名。
+    /// 已启用/配置的翻译平台凭据列表（动态增删）。
     /// </summary>
-    public const string BaiduAppIdLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "BaiduAppId";
-
-    /// <summary>
-    /// 设置页"百度密钥"文本框的翻译键名。
-    /// </summary>
-    public const string BaiduSecretKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "BaiduSecretKey";
-
-    /// <summary>
-    /// 火山引擎 AccessKey，从设置界面输入，持久化保存。
-    /// </summary>
-    public string VolcengineAccessKey = string.Empty;
-
-    /// <summary>
-    /// 火山引擎 SecretKey，从设置界面输入，持久化保存。
-    /// </summary>
-    public string VolcengineSecretKey = string.Empty;
-
-    /// <summary>
-    /// 阿里云 AccessKeyId，从设置界面输入，持久化保存。
-    /// </summary>
-    public string AliyunAccessKeyId = string.Empty;
-
-    /// <summary>
-    /// 阿里云 AccessKeySecret，从设置界面输入，持久化保存。
-    /// </summary>
-    public string AliyunAccessKeySecret = string.Empty;
-
-    /// <summary>
-    /// 百度翻译 APP ID，从设置界面输入，持久化保存。
-    /// </summary>
-    public string BaiduAppId = string.Empty;
-
-    /// <summary>
-    /// 百度翻译密钥，从设置界面输入，持久化保存。
-    /// </summary>
-    public string BaiduSecretKey = string.Empty;
-
-    /// <summary>
-    /// 设置持久化键名：火山引擎 AccessKey。
-    /// </summary>
-    public const string VolcengineAccessKeyScribeKey = "volcengineAccessKey";
-
-    /// <summary>
-    /// 设置持久化键名：火山引擎 SecretKey。
-    /// </summary>
-    public const string VolcengineSecretKeyScribeKey = "volcengineSecretKey";
-
-    /// <summary>
-    /// 设置持久化键名：阿里云 AccessKeyId。
-    /// </summary>
-    public const string AliyunAccessKeyIdScribeKey = "aliyunAccessKeyId";
-
-    /// <summary>
-    /// 设置持久化键名：阿里云 AccessKeySecret。
-    /// </summary>
-    public const string AliyunAccessKeySecretScribeKey = "aliyunAccessKeySecret";
-
-    /// <summary>
-    /// 设置持久化键名：百度翻译 APP ID。
-    /// </summary>
-    public const string BaiduAppIdScribeKey = "baiduAppId";
-
-    /// <summary>
-    /// 设置持久化键名：百度翻译密钥。
-    /// </summary>
-    public const string BaiduSecretKeyScribeKey = "baiduSecretKey";
+    public List<PlatformCredential> Credentials = new List<PlatformCredential>();
 
     public override void ExposeData()
     {
         base.ExposeData();
         Scribe_Values.Look(ref EnableKeyRecording, EnableKeyRecordingScribeKey, true);
         Scribe_Values.Look(ref EnableRealtimeUpdate, EnableRealtimeUpdateScribeKey, true);
-        Scribe_Values.Look(ref VolcengineAccessKey, VolcengineAccessKeyScribeKey, string.Empty);
-        Scribe_Values.Look(ref VolcengineSecretKey, VolcengineSecretKeyScribeKey, string.Empty);
-        Scribe_Values.Look(ref AliyunAccessKeyId, AliyunAccessKeyIdScribeKey, string.Empty);
-        Scribe_Values.Look(ref AliyunAccessKeySecret, AliyunAccessKeySecretScribeKey, string.Empty);
-        Scribe_Values.Look(ref BaiduAppId, BaiduAppIdScribeKey, string.Empty);
-        Scribe_Values.Look(ref BaiduSecretKey, BaiduSecretKeyScribeKey, string.Empty);
+        Scribe_Collections.Look(ref Credentials, "credentials", LookMode.Deep);
+    }
+
+    /// <summary>是否已启用指定平台。</summary>
+    public bool HasPlatform(string platformId)
+    {
+        return Credentials.Any(c => c.PlatformId == platformId);
+    }
+
+    /// <summary>获取指定平台的凭据（不存在返回 null）。</summary>
+    public PlatformCredential GetCredential(string platformId)
+    {
+        return Credentials.FirstOrDefault(c => c.PlatformId == platformId);
+    }
+
+    /// <summary>启用指定平台（若尚未存在则追加一条空记录）。</summary>
+    public void EnablePlatform(string platformId)
+    {
+        if (!HasPlatform(platformId))
+        {
+            Credentials.Add(new PlatformCredential { PlatformId = platformId });
+        }
+    }
+
+    /// <summary>停用指定平台（移除其凭据记录）。</summary>
+    public void DisablePlatform(string platformId)
+    {
+        Credentials.RemoveAll(c => c.PlatformId == platformId);
     }
 }

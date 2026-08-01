@@ -69,24 +69,40 @@ public class AutoTranslatorMod : Mod
             AutoTranslatorSettings.EnableRealtimeUpdateKey.Translate(),
             ref settings.EnableRealtimeUpdate);
 
-        // 翻译平台凭据
-        listing.Label(AutoTranslatorSettings.VolcengineAccessKeyLabelKey.Translate());
-        settings.VolcengineAccessKey = listing.TextEntry(settings.VolcengineAccessKey);
+        // 翻译平台：上方列表（勾选启用哪些平台）
+        listing.Label(AutoTranslatorSettings.PlatformListHeaderKey.Translate());
+        foreach (string platformId in AutoTranslatorSettings.PlatformIds)
+        {
+            bool enabled = settings.HasPlatform(platformId);
+            listing.CheckboxLabeled(
+                AutoTranslatorSettings.PlatformLabelKeys[platformId].Translate(),
+                ref enabled);
+            // CheckboxLabeled 通过 ref 回写最新勾选状态；同步到凭据列表（幂等）。
+            if (enabled)
+            {
+                settings.EnablePlatform(platformId);
+            }
+            else
+            {
+                settings.DisablePlatform(platformId);
+            }
+        }
 
-        listing.Label(AutoTranslatorSettings.VolcengineSecretKeyLabelKey.Translate());
-        settings.VolcengineSecretKey = listing.TextEntry(settings.VolcengineSecretKey);
+        // 下方凭据表格：已启用平台逐行设置访问键与密钥
+        listing.Gap(12f);
+        listing.Label(AutoTranslatorSettings.CredentialTableHeaderKey.Translate());
+        listing.Label(AutoTranslatorSettings.AccessKeyLabelKey.Translate());
+        listing.Label(AutoTranslatorSettings.SecretKeyLabelKey.Translate());
 
-        listing.Label(AutoTranslatorSettings.AliyunAccessKeyIdLabelKey.Translate());
-        settings.AliyunAccessKeyId = listing.TextEntry(settings.AliyunAccessKeyId);
-
-        listing.Label(AutoTranslatorSettings.AliyunAccessKeySecretLabelKey.Translate());
-        settings.AliyunAccessKeySecret = listing.TextEntry(settings.AliyunAccessKeySecret);
-
-        listing.Label(AutoTranslatorSettings.BaiduAppIdLabelKey.Translate());
-        settings.BaiduAppId = listing.TextEntry(settings.BaiduAppId);
-
-        listing.Label(AutoTranslatorSettings.BaiduSecretKeyLabelKey.Translate());
-        settings.BaiduSecretKey = listing.TextEntry(settings.BaiduSecretKey);
+        foreach (PlatformCredential cred in settings.Credentials)
+        {
+            listing.Gap(6f);
+            string label = AutoTranslatorSettings.PlatformLabelKeys.TryGetValue(
+                cred.PlatformId, out string key) ? key.Translate() : cred.PlatformId;
+            listing.Label(label);
+            cred.AccessKey = listing.TextEntry(cred.AccessKey);
+            cred.SecretKey = listing.TextEntry(cred.SecretKey);
+        }
 
         listing.End();
     }

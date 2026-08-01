@@ -15,4 +15,8 @@
   <AutoTranslator.Volcengine>火山引擎</AutoTranslator.Volcengine>
   <AutoTranslator.Baidu>百度翻译</AutoTranslator.Baidu>
   <AutoTranslator.Aliyun>阿里云翻译</AutoTranslator.Aliyun>
+  <AutoTranslator.PlatformList>可用平台</AutoTranslator.PlatformList>
+  <AutoTranslator.CredentialTable>凭据</AutoTranslator.CredentialTable>
+  <AutoTranslator.AccessKey>访问键</AutoTranslator.AccessKey>
+  <AutoTranslator.SecretKey>密钥</AutoTranslator.SecretKey>
 </LanguageData>
