@@ -36,18 +36,24 @@ public static class TranslationPatch
         }
         TaggedString saveresult;
         LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out saveresult);
-        // 记录原文的未翻译 key 到 auto.xml（持久化，供补译参考）。
-        WriteAutoKey(key, saveresult);
+        string fallback = saveresult.NullOrEmpty() ? key : saveresult.ToString();
 
-        // 提交异步翻译：后台线程翻译完成后实时回写 RimWorld 字典，下次查询即命中。
+        // 提交异步翻译：后台线程翻译完成后实时回写 RimWorld 字典，并写 auto.xml。
+        // 成功写译文、失败写原文（fallback）。主线程不写 auto.xml，避免翻译前就落原文。
         // source 固定为默认语言（英文），target 为当前激活语言。
         AutoTranslatorEngine.RequestTranslate(
             key,
             LanguageDatabase.defaultLanguage.folderName,
-            LanguageDatabase.activeLanguage.folderName);
+            LanguageDatabase.activeLanguage.folderName,
+            fallback);
     }
 
-    private static void WriteAutoKey(string key, string originalKey)
+    /// <summary>
+    /// 将 key 写入当前激活语言包的 auto.xml。
+    /// overwrite=true 时（翻译成功写译文）覆盖已有记录；
+    /// overwrite=false 时（翻译失败写原文）仅在尚无记录时写入，避免覆盖已成功的译文。
+    /// </summary>
+    public static void WriteAutoKey(string key, string value, bool overwrite = false)
     {
         try
         {
@@ -70,14 +76,21 @@ public static class TranslationPatch
                 return;
             }
 
-            // 已存在则跳过
-            if (root.Element(key) != null)
+            var existing = root.Element(key);
+            if (existing != null)
             {
-                return;
+                if (!overwrite)
+                {
+                    return; // 已有记录且非覆盖模式，跳过（保留更优的译文）
+                }
+
+                existing.Value = value;
+            }
+            else
+            {
+                root.Add(new XElement(key, value));
             }
 
-            // value 写默认语言（English）的英原文，便于阅读与补译
-            root.Add(new XElement(key, originalKey));
             doc.Save(AutoXmlPath);
         }
         catch (System.Exception ex)

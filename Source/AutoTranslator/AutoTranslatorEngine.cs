@@ -10,11 +10,11 @@ namespace nomadicooer.AutoTranslator;
 /// 自动翻译引擎（消费层，异步）。
 /// 主线程遇到未翻译 key 时调用 <see cref="RequestTranslate"/> 入队（不阻塞）；
 /// 后台线程从队列取任务，调用 <see cref="TranslationDispatcher"/>（其内部为同步阻塞实现）翻译，
-/// 拿到译文后：
-///   1) 写进 RimWorld 当前激活语言的 keyedReplacements 字典（实时生效，下次查询该 key 即命中，无需重载语言包）；
-///   2) 存入内存 cache（已翻译的 key 不再请求 API）。
-/// auto.xml 的原文记录仍由 TranslationPatch 在主线程完成。
-/// 已翻译的 key 通过 cache + pending 双层去重，绝不重复打 API。
+    /// 拿到译文后：
+    ///   1) 写进 RimWorld 当前激活语言的 keyedReplacements 字典（实时生效，下次查询该 key 即命中，无需重载语言包）；
+    ///   2) 存入内存 cache（已翻译的 key 不再请求 API）；
+    ///   3) 写 auto.xml：翻译成功写译文，失败写原文（fallback）。
+    /// 已翻译的 key 通过 cache + pending 双层去重，绝不重复打 API。
 /// 切换语言概率极低，未做完整兼容：后台线程检测到 activeLanguage 已变则跳过回写（不崩，仅该批译文不生效）。
 /// </summary>
 public static class AutoTranslatorEngine
@@ -24,6 +24,7 @@ public static class AutoTranslatorEngine
         public string Key;
         public string Source;
         public string Target;
+        public string Fallback; // 翻译失败时的回退原文（写 auto.xml 用）
     }
 
     // 待翻译队列：后台线程从此处取任务。BlockingCollection 在 .NET Framework 4.0+ 可用。
@@ -85,7 +86,8 @@ public static class AutoTranslatorEngine
     /// <param name="key">未翻译的翻译键（即 RimWorld 原文文本）。</param>
     /// <param name="source">源语言（RimWorld 语言文件夹名，如 "English"）。</param>
     /// <param name="target">目标语言（RimWorld 语言文件夹名，如 "ChineseSimplified (简体中文)"）。</param>
-    public static void RequestTranslate(string key, string source, string target)
+    /// <param name="fallback">翻译失败时的回退原文，用于写 auto.xml。</param>
+    public static void RequestTranslate(string key, string source, string target, string fallback)
     {
         if (!_running || key == null)
         {
@@ -107,20 +109,24 @@ public static class AutoTranslatorEngine
             Pending.Add(key);
         }
 
-        Queue.Add(new Job { Key = key, Source = source, Target = target });
+        Queue.Add(new Job { Key = key, Source = source, Target = target, Fallback = fallback });
     }
 
     private static void ConsumeLoop()
     {
         foreach (Job job in Queue.GetConsumingEnumerable())
         {
+            bool ok = false;
+            string translated = null;
             try
             {
                 TranslationResult result = _dispatcher.Translate(job.Source, job.Target, job.Key);
                 if (result.Success && !string.IsNullOrEmpty(result.TranslatedText))
                 {
-                    Cache[job.Key] = result.TranslatedText;
-                    WriteToRimWorld(job.Key, result.TranslatedText);
+                    ok = true;
+                    translated = result.TranslatedText;
+                    Cache[job.Key] = translated;
+                    WriteToRimWorld(job.Key, translated);
                 }
             }
             catch (Exception ex)
@@ -129,6 +135,16 @@ public static class AutoTranslatorEngine
             }
             finally
             {
+                // auto.xml：成功写译文（覆盖），失败写原文（不覆盖已有译文）。
+                if (ok)
+                {
+                    TranslationPatch.WriteAutoKey(job.Key, translated, overwrite: true);
+                }
+                else
+                {
+                    TranslationPatch.WriteAutoKey(job.Key, job.Fallback, overwrite: false);
+                }
+
                 lock (PendingLock)
                 {
                     Pending.Remove(job.Key);
