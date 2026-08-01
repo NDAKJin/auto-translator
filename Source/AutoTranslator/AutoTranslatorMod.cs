@@ -27,6 +27,14 @@ public class AutoTranslatorMod : Mod
     public static bool AutoTranslateEnabled => Instance?.settings.EnableAutoTranslate ?? true;
 
     /// <summary>
+    /// 是否启用实时翻译（供 TranslationPatch / Engine 在静态上下文读取）。
+    /// 开启即边拦截边调 API 翻译并回写 auto.xml；
+    /// 关闭则拦截时只记录 key 进 pending.xml，不调用 API、不回写，
+    /// 待玩家点击"一键翻译"批量处理。依赖总开关开启才有意义。
+    /// </summary>
+    public static bool RealtimeUpdateEnabled => Instance?.settings.EnableRealtimeUpdate ?? true;
+
+    /// <summary>
     /// 模组设置实例（供启动初始化等静态上下文读取凭据等）。
     /// </summary>
     public static AutoTranslatorSettings Settings => Instance?.settings;
@@ -89,6 +97,18 @@ public class AutoTranslatorMod : Mod
             listing.CheckboxLabeled(
                 AutoTranslatorSettings.EnableAutoTranslateKey.Translate(),
                 ref settings.EnableAutoTranslate);
+
+            // 是否启用实时翻译（总开关开启时才有效）
+            listing.CheckboxLabeled(
+                AutoTranslatorSettings.EnableRealtimeUpdateKey.Translate(),
+                ref settings.EnableRealtimeUpdate);
+
+            // 一键翻译：把 pending.xml 中记录的未翻译 key 批量提交翻译并写 auto.xml。
+            // 仅在实时翻译关闭时有实际意义（关闭时 key 只在 pending.xml 沉淀）。
+            if (listing.ButtonText(AutoTranslatorSettings.TranslateAllKey.Translate()))
+            {
+                AutoTranslatorEngine.TranslateAllPending();
+            }
 
             // 翻译平台：上方列表（勾选启用哪些平台）—— 作为加粗放大的 section 标题渲染。
             // 直接用 Text.Font + Widgets.Label 自绘比改 Listing_Standard 更轻量。

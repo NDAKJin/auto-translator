@@ -58,6 +58,13 @@ public class AutoTranslatorSettings : ModSettings
     public bool EnableAutoTranslate = true;
 
     /// <summary>
+    /// 是否启用实时翻译。开启后拦截未翻译 key 时边调 API 边回写 auto.xml；
+    /// 关闭后只把 key 记录进 pending.xml（待翻译清单），不调用 API、不回写，
+    /// 待玩家在设置页点击"一键翻译"时再批量消费。总开关关闭时本开关无意义。
+    /// </summary>
+    public bool EnableRealtimeUpdate = true;
+
+    /// <summary>
     /// 设置页"凭据"区域是否折叠（true=折叠隐藏所有平台凭据，false=展开）。
     /// </summary>
     public bool CredentialsCollapsed = false;
@@ -66,6 +73,11 @@ public class AutoTranslatorSettings : ModSettings
     /// 设置持久化键名：是否启用自动翻译（总开关）。
     /// </summary>
     public const string EnableAutoTranslateScribeKey = "enableAutoTranslate";
+
+    /// <summary>
+    /// 设置持久化键名：是否启用实时翻译。
+    /// </summary>
+    public const string EnableRealtimeUpdateScribeKey = "enableRealtimeUpdate";
 
     /// <summary>
     /// 设置持久化键名：凭据区域是否折叠。
@@ -91,6 +103,16 @@ public class AutoTranslatorSettings : ModSettings
     /// 设置页"是否启用自动翻译"复选框的翻译键名。
     /// </summary>
     public const string EnableAutoTranslateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableAutoTranslate";
+
+    /// <summary>
+    /// 设置页"是否启用实时翻译"复选框的翻译键名。
+    /// </summary>
+    public const string EnableRealtimeUpdateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableRealtimeUpdate";
+
+    /// <summary>
+    /// 设置页"一键翻译"按钮的翻译键名。
+    /// </summary>
+    public const string TranslateAllKey = AutoTranslatorConstants.TranslationKeyPrefix + "TranslateAll";
 
     /// <summary>
     /// 设置页"可用平台"列表标题的翻译键名。
@@ -129,6 +151,7 @@ public class AutoTranslatorSettings : ModSettings
     {
         base.ExposeData();
         Scribe_Values.Look(ref EnableAutoTranslate, EnableAutoTranslateScribeKey, true);
+        Scribe_Values.Look(ref EnableRealtimeUpdate, EnableRealtimeUpdateScribeKey, true);
         Scribe_Values.Look(ref CredentialsCollapsed, CredentialsCollapsedScribeKey, false);
         Scribe_Collections.Look(ref credentials, "credentials", LookMode.Deep);
         // 读档失败时 Scribe 可能把 credentials 置 null，兜底重建空列表。
@@ -175,6 +198,7 @@ public class AutoTranslatorSettings : ModSettings
     {
         Credentials.Clear();
         EnableAutoTranslate = true;
+        EnableRealtimeUpdate = true;
         CredentialsCollapsed = false;
     }
 }
