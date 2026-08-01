@@ -46,9 +46,9 @@ public class AutoTranslatorSettings : ModSettings
     /// <summary>各平台在设置页显示的翻译键名（key 为 PlatformId）。</summary>
     public static readonly IReadOnlyDictionary<string, string> PlatformLabelKeys = new Dictionary<string, string>
     {
-        { "Volcengine", AutoTranslatorConstants.TranslationKeyPrefix + "Platform.Volcengine" },
-        { "Aliyun", AutoTranslatorConstants.TranslationKeyPrefix + "Platform.Aliyun" },
-        { "Baidu", AutoTranslatorConstants.TranslationKeyPrefix + "Platform.Baidu" }
+        { "Volcengine", AutoTranslatorConstants.TranslationKeyPrefix + "Volcengine" },
+        { "Aliyun", AutoTranslatorConstants.TranslationKeyPrefix + "Aliyun" },
+        { "Baidu", AutoTranslatorConstants.TranslationKeyPrefix + "Baidu" }
     };
     /// <summary>
     /// 是否在翻译失败时记录未翻译的 key 到当前语言包的 auto.xml。
