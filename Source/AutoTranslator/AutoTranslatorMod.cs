@@ -19,12 +19,9 @@ public class AutoTranslatorMod : Mod
     private readonly AutoTranslatorSettings settings;
 
     /// <summary>
-    /// 是否启用翻译键记录（供 TranslationPatch 在静态上下文读取）。
-    /// </summary>
-    public static bool KeyRecordingEnabled => Instance?.settings.EnableKeyRecording ?? true;
-
-    /// <summary>
     /// 是否实时翻译（供 TranslationPatch 在静态上下文读取）。
+    /// 总开关 EnableAutoTranslate 开启时，未翻译 key 必然记录到 auto.xml，
+    /// 此开关仅决定“是否实时请求翻译”。
     /// </summary>
     public static bool RealtimeUpdateEnabled => Instance?.settings.EnableRealtimeUpdate ?? true;
 
@@ -99,12 +96,7 @@ public class AutoTranslatorMod : Mod
                 AutoTranslatorSettings.EnableAutoTranslateKey.Translate(),
                 ref settings.EnableAutoTranslate);
 
-            // 是否启用翻译键记录
-            listing.CheckboxLabeled(
-                AutoTranslatorSettings.EnableKeyRecordingKey.Translate(),
-                ref settings.EnableKeyRecording);
-
-            // 是否实时更新未翻译字串
+            // 是否实时更新未翻译字串（总开关开启时，未翻译 key 自动记录，此开关控制是否实时请求翻译）
             listing.CheckboxLabeled(
                 AutoTranslatorSettings.EnableRealtimeUpdateKey.Translate(),
                 ref settings.EnableRealtimeUpdate);

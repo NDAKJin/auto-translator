@@ -51,20 +51,15 @@ public class AutoTranslatorSettings : ModSettings
         { "Baidu", AutoTranslatorConstants.TranslationKeyPrefix + "Baidu" }
     };
     /// <summary>
-    /// 是否启用自动翻译（总开关）。
+    /// 是否启用自动翻译（总开关）。启用后必然记录未翻译 key，
     /// 关闭后引擎停止、不再调用翻译 API、不再写新 key，
     /// 但本模组仍加载，已写入的 auto.xml 译文继续随语言包生效。
     /// </summary>
     public bool EnableAutoTranslate = true;
 
     /// <summary>
-    /// 是否在翻译失败时记录未翻译的 key 到当前语言包的 auto.xml。
-    /// </summary>
-    public bool EnableKeyRecording = true;
-
-    /// <summary>
-    /// 是否实时翻译：开启时翻译失败立即写入 auto.xml；
-    /// 关闭时仅回退显示、不记录未翻译 key。
+    /// 是否实时翻译：开启时翻译失败立即请求翻译并写入 auto.xml；
+    /// 关闭时仅记录未翻译 key（回退原文），不实时翻译。
     /// </summary>
     public bool EnableRealtimeUpdate = true;
 
@@ -72,11 +67,6 @@ public class AutoTranslatorSettings : ModSettings
     /// 设置持久化键名：是否启用自动翻译（总开关）。
     /// </summary>
     public const string EnableAutoTranslateScribeKey = "enableAutoTranslate";
-
-    /// <summary>
-    /// 设置持久化键名：是否启用翻译键记录。
-    /// </summary>
-    public const string EnableKeyRecordingScribeKey = "enableKeyRecording";
 
     /// <summary>
     /// 设置持久化键名：是否实时更新未翻译字串。
@@ -99,19 +89,14 @@ public class AutoTranslatorSettings : ModSettings
     public const string DefaultLanguageKey = AutoTranslatorConstants.TranslationKeyPrefix + "DefaultLanguage";
 
     /// <summary>
-    /// 设置页"是否启用翻译键记录"复选框的翻译键名。
+    /// 设置页"是否启用自动翻译"复选框的翻译键名。
     /// </summary>
-    public const string EnableKeyRecordingKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableKeyRecording";
+    public const string EnableAutoTranslateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableAutoTranslate";
 
     /// <summary>
     /// 设置页"是否实时翻译"复选框的翻译键名。
     /// </summary>
     public const string EnableRealtimeUpdateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableRealtimeUpdate";
-
-    /// <summary>
-    /// 设置页"是否启用自动翻译"复选框的翻译键名。
-    /// </summary>
-    public const string EnableAutoTranslateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableAutoTranslate";
 
     /// <summary>
     /// 设置页"可用平台"列表标题的翻译键名。
@@ -150,7 +135,6 @@ public class AutoTranslatorSettings : ModSettings
     {
         base.ExposeData();
         Scribe_Values.Look(ref EnableAutoTranslate, EnableAutoTranslateScribeKey, true);
-        Scribe_Values.Look(ref EnableKeyRecording, EnableKeyRecordingScribeKey, true);
         Scribe_Values.Look(ref EnableRealtimeUpdate, EnableRealtimeUpdateScribeKey, true);
         Scribe_Collections.Look(ref credentials, "credentials", LookMode.Deep);
         // 读档失败时 Scribe 可能把 credentials 置 null，兜底重建空列表。
@@ -197,7 +181,6 @@ public class AutoTranslatorSettings : ModSettings
     {
         Credentials.Clear();
         EnableAutoTranslate = true;
-        EnableKeyRecording = true;
         EnableRealtimeUpdate = true;
     }
 }

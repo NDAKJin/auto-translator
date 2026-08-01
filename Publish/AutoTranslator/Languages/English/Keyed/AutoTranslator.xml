@@ -5,7 +5,6 @@
   <AutoTranslator.ActiveLanguage>Active language: {0}</AutoTranslator.ActiveLanguage>
   <AutoTranslator.DefaultLanguage>Default language: {0}</AutoTranslator.DefaultLanguage>
   <AutoTranslator.EnableAutoTranslate>Enable auto translation</AutoTranslator.EnableAutoTranslate>
-  <AutoTranslator.EnableKeyRecording>Record untranslated keys</AutoTranslator.EnableKeyRecording>
   <AutoTranslator.EnableRealtimeUpdate>Real-time translation</AutoTranslator.EnableRealtimeUpdate>
   <AutoTranslator.VolcengineAccessKey>Volcengine AccessKey</AutoTranslator.VolcengineAccessKey>
   <AutoTranslator.VolcengineSecretKey>Volcengine SecretKey</AutoTranslator.VolcengineSecretKey>
