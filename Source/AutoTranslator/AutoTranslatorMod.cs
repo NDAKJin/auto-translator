@@ -192,6 +192,11 @@ public class AutoTranslatorMod : Mod
         // WriteSettings 是 Verse.Mod 的方法（Mod 实例持有 ModSettings 引用），
         // 会序列化 settings.ExposeData 中的字段到 {ModId}.xml。
         WriteSettings();
+
+        // 写盘后即时刷新引擎翻译源：玩家在设置页补填 / 修改凭据后，
+        // 引擎持有的 dispatcher 立即重建并生效，无需重启游戏。
+        // 若总开关 / 实时翻译被关闭，RefreshSources 内部会顺带停止引擎。
+        AutoTranslatorEngine.RefreshSources();
     }
 
     /// <summary>

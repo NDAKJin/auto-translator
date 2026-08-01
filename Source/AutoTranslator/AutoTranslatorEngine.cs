@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using Verse;
 
@@ -34,7 +35,8 @@ public static class AutoTranslatorEngine
     }
 
     // 待翻译队列：后台线程从此处取任务。BlockingCollection 在 .NET Framework 4.0+ 可用。
-    private static readonly BlockingCollection<Job> Queue = new BlockingCollection<Job>();
+    // 非 readonly：Stop 后需要重建新队列供重新启动时消费（CompleteAdding 后的集合不可再用）。
+    private static BlockingCollection<Job> Queue = new BlockingCollection<Job>();
 
     // 已翻译结果缓存：原文 key -> 译文。后台线程写、主线程（经 TryTranslate 命中）间接读。
     private static readonly ConcurrentDictionary<string, string> Cache =
@@ -50,30 +52,221 @@ public static class AutoTranslatorEngine
     private static TranslationDispatcher _dispatcher;
     private static Thread _worker;
     private static bool _running;
+    private static readonly object EngineLock = new object();
 
     // 绑定回写的语言 folderName；切语言后据此跳过回写，避免写错语言对象。
     private static string _boundFolderName;
 
     /// <summary>
-    /// 注入已注册好翻译源的调度器并启动后台消费线程。
-    /// 应在主线程初始化阶段（如 <see cref="AutoTranslatorStartup"/>）调用一次。
+    /// 平台标志（完整 PlatformNameKey，如 "AutoTranslator.Volcengine"） → 对应 TranslatePlatform 子类的缓存。
+    /// 启动时反射扫描一次，之后按 cred.PlatformId（即 PlatformNameKey）直接取类型实例化，
+    /// 不再写死的 switch，新增/删除平台只改对应引擎类本身。
+    /// 原位于 AutoTranslatorStartup，下沉到 Engine 以支持运行期凭据刷新（避免分层反向依赖）。
     /// </summary>
-    /// <param name="dispatcher">已 new 好翻译源并 Register 的调度器实例。</param>
-    public static void Configure(TranslationDispatcher dispatcher)
+    private static readonly Dictionary<string, Type> PlatformTypes = ScanPlatformTypes();
+
+    /// <summary>
+    /// 反射扫描本程序集内所有 TranslatePlatform 子类，读取其公共常量 PlatformNameKey
+    /// （"AutoTranslator.Volcengine" 形式）作为平台标志建索引。
+    /// </summary>
+    private static Dictionary<string, Type> ScanPlatformTypes()
     {
-        if (_running)
+        var map = new Dictionary<string, Type>(StringComparer.Ordinal);
+        foreach (Type type in Assembly.GetExecutingAssembly().GetTypes())
         {
-            return;
+            if (type.IsAbstract || type.IsInterface || !typeof(TranslatePlatform).IsAssignableFrom(type))
+            {
+                continue;
+            }
+
+            // 找公共常量 PlatformNameKey（引擎类已改为 public）
+            FieldInfo field = type.GetField("PlatformNameKey", BindingFlags.Public | BindingFlags.Static);
+            if (field == null || !field.IsLiteral || field.FieldType != typeof(string))
+            {
+                continue;
+            }
+
+            string fullKey = (string)field.GetValue(null);
+            if (!string.IsNullOrEmpty(fullKey))
+            {
+                map[fullKey] = type;
+            }
         }
 
-        _dispatcher = dispatcher;
-        if (_dispatcher == null)
+        return map;
+    }
+
+    /// <summary>
+    /// 按平台标志（cred.PlatformId，应为完整 PlatformNameKey）实例化翻译平台
+    /// （构造函数签名为 (string accessKey, string secretKey)）。
+    /// 优先用完整 PlatformNameKey 匹配；找不到时兼容旧存档里的裸短名（去前缀形式）。
+    /// 找不到对应类型返回 null。
+    /// </summary>
+    private static TranslatePlatform CreatePlatform(string platformId, string accessKey, string secretKey)
+    {
+        string resolved = platformId;
+        if (!PlatformTypes.TryGetValue(resolved, out Type type))
         {
-            Logger.Warning("翻译调度器为空，自动翻译引擎未启动。");
-            return;
+            // 兼容旧存档：cred.PlatformId 可能是不带前缀的裸短名（如 "Volcengine"）
+            string prefixed = AutoTranslatorConstants.TranslationKeyPrefix + platformId;
+            if (PlatformTypes.TryGetValue(prefixed, out type))
+            {
+                resolved = prefixed;
+            }
+            else
+            {
+                Logger.Warning("未知翻译平台: " + platformId);
+                return null;
+            }
         }
 
+        try
+        {
+            return (TranslatePlatform)Activator.CreateInstance(type, accessKey, secretKey);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning("创建翻译平台实例失败: " + resolved + " -> " + ex.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 从当前设置（AutoTranslatorMod.Settings.Credentials）构建翻译源列表。
+    /// 仅收录 accessKey / secretKey 均非空的凭据；凭据不完整则跳过。
+    /// </summary>
+    private static List<TranslatePlatform> BuildSources()
+    {
+        var sources = new List<TranslatePlatform>();
+        AutoTranslatorSettings settings = AutoTranslatorMod.Settings;
+        if (settings == null)
+        {
+            return sources;
+        }
+
+        foreach (PlatformCredential cred in settings.Credentials)
+        {
+            if (string.IsNullOrEmpty(cred.AccessKey) || string.IsNullOrEmpty(cred.SecretKey))
+            {
+                continue; // 凭据不完整则跳过
+            }
+
+            // 按 cred.PlatformId 匹配引擎类的 PlatformNameKey（去前缀），自动实例化，无写死 switch。
+            TranslatePlatform source = CreatePlatform(cred.PlatformId, cred.AccessKey, cred.SecretKey);
+            if (source != null)
+            {
+                sources.Add(source);
+            }
+        }
+
+        return sources;
+    }
+
+    /// <summary>
+    /// 启动自动翻译引擎并注入翻译源。应在主线程初始化阶段调用一次
+    /// （如 <see cref="AutoTranslatorStartup"/> 在总开关 + 实时翻译均开启时触发）。
+    /// 启动条件（总开关 / 实时翻译）由调用方判断，本方法只负责构建翻译源 + 启动后台消费线程。
+    /// 引擎启动不依赖"是否配置了平台凭据"：未配凭据时也启动（dispatcher 带空源集合，
+    /// 翻译请求会因 _sources.Count==0 安全返回失败原文，不会崩溃）。
+    /// 玩家运行期在设置页补填凭据后由 <see cref="RefreshSources"/> 即时生效，无需重启游戏。
+    /// </summary>
+    public static void Configure()
+    {
+        lock (EngineLock)
+        {
+            if (_running)
+            {
+                return;
+            }
+
+            List<TranslatePlatform> sources = BuildSources();
+            StartEngine(sources);
+        }
+    }
+
+    /// <summary>
+    /// 运行期刷新翻译源（玩家在设置页补填 / 修改凭据并保存时调用）。
+    /// 重新从当前设置构建 dispatcher 并替换引擎持有的引用；若引擎此前因总开关/实时翻译关闭而未启动，
+    /// 则在此一并启动；若总开关或实时翻译已关闭，则停止引擎。
+    /// 这样首次启动未填凭据的玩家，在设置页填完密钥保存后即可即时生效，无需重启游戏。
+    /// </summary>
+    public static void RefreshSources()
+    {
+        lock (EngineLock)
+        {
+            if (!AutoTranslatorMod.AutoTranslateEnabled || !AutoTranslatorMod.RealtimeUpdateEnabled)
+            {
+                Stop();
+                return;
+            }
+
+            List<TranslatePlatform> sources = BuildSources();
+            _dispatcher = new TranslationDispatcher(sources);
+            if (!_running)
+            {
+                StartWorker();
+            }
+
+            if (sources.Count == 0)
+            {
+                Logger.Warning("未配置任何翻译平台凭据，自动翻译引擎已启动但翻译不会生效（需在设置页配置凭据）。");
+            }
+            else
+            {
+                Logger.Message(string.Format("翻译源已刷新，已启用 {0} 个翻译平台。", sources.Count));
+            }
+        }
+    }
+
+    /// <summary>
+    /// 停止后台消费线程并清空翻译源（总开关关闭 / 实时翻译关闭时调用）。
+    /// </summary>
+    public static void Stop()
+    {
+        lock (EngineLock)
+        {
+            if (!_running)
+            {
+                return;
+            }
+
+            _running = false;
+            _dispatcher = null;
+            Queue.CompleteAdding();
+            Logger.Message("自动翻译引擎已停止。");
+        }
+    }
+
+    /// <summary>
+    /// 构建 dispatcher 并启动后台线程（假定 EngineLock 已持有）。首次启动或刷新后补全启动用。
+    /// </summary>
+    private static void StartEngine(List<TranslatePlatform> sources)
+    {
+        _dispatcher = new TranslationDispatcher(sources);
+        StartWorker();
+
+        if (sources.Count == 0)
+        {
+            Logger.Warning("未配置任何翻译平台凭据，自动翻译引擎已启动但翻译不会生效（需在设置页配置凭据）。");
+        }
+        else
+        {
+            Logger.Message(string.Format("自动翻译引擎已启动（后台消费线程），已启用 {0} 个翻译平台。", sources.Count));
+        }
+    }
+
+    /// <summary>
+    /// 启动后台消费线程（假定 EngineLock 已持有且 _dispatcher 已就绪）。
+    /// 旧的 BlockingCollection 若已 CompleteAdding，则重建一个新队列供新线程消费。
+    /// </summary>
+    private static void StartWorker()
+    {
         _boundFolderName = LanguageDatabase.activeLanguage?.folderName;
+        if (Queue.IsAddingCompleted)
+        {
+            Queue = new BlockingCollection<Job>();
+        }
+
         _running = true;
         _worker = new Thread(ConsumeLoop)
         {
@@ -81,7 +274,6 @@ public static class AutoTranslatorEngine
             Name = "AutoTranslator.Worker"
         };
         _worker.Start();
-        Logger.Message("自动翻译引擎已启动（后台消费线程）。");
     }
 
     /// <summary>
@@ -153,6 +345,12 @@ public static class AutoTranslatorEngine
                 Pending.Add(key);
             }
 
+            if (Queue.IsAddingCompleted)
+            {
+                Logger.Warning("自动翻译引擎已停止，无法继续提交一键翻译任务。");
+                break;
+            }
+
             Queue.Add(new Job
             {
                 Key = key,
@@ -185,6 +383,11 @@ public static class AutoTranslatorEngine
             Pending.Add(key);
         }
 
+        if (Queue.IsAddingCompleted)
+        {
+            return; // 引擎已停止（队列已 CloseAdding），丢弃该请求
+        }
+
         Queue.Add(new Job
         {
             Key = key,
@@ -200,12 +403,13 @@ public static class AutoTranslatorEngine
         {
             bool ok = false;
             string translated = null;
+            TranslationDispatcher dispatcher = _dispatcher; // 本地捕获，避免 RefreshSources 替换后并发读
             try
             {
-                if (AutoTranslatorMod.RealtimeUpdateEnabled)
+                if (AutoTranslatorMod.RealtimeUpdateEnabled && dispatcher != null)
                 {
                     // 实时翻译开启：调 API 翻译 -> 回写内存 -> 写 auto.xml（译文）
-                    TranslationResult result = _dispatcher.Translate(job.Source, job.Target, job.Fallback);
+                    TranslationResult result = dispatcher.Translate(job.Source, job.Target, job.Fallback);
                     if (result.Success && !string.IsNullOrEmpty(result.TranslatedText))
                     {
                         ok = true;
