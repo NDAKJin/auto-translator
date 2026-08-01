@@ -138,11 +138,11 @@ public static class AutoTranslatorEngine
                 // auto.xml：成功写译文（覆盖），失败写原文（不覆盖已有译文）。
                 if (ok)
                 {
-                    TranslationPatch.WriteAutoKey(job.Key, translated, overwrite: true);
+                    AutoXmlWriter.WriteAutoKey(job.Key, translated, overwrite: true);
                 }
                 else
                 {
-                    TranslationPatch.WriteAutoKey(job.Key, job.Fallback, overwrite: false);
+                    AutoXmlWriter.WriteAutoKey(job.Key, job.Fallback, overwrite: false);
                 }
 
                 lock (PendingLock)
