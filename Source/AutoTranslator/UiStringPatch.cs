@@ -32,19 +32,23 @@ public static class UiStringPatch
     private static readonly Dictionary<string, string> UiCache =
         new Dictionary<string, string>(StringComparer.Ordinal);
 
-    private static bool _cacheLoaded;
+    /// <summary>UiCache 对应的语言 folderName；切语言后据此判定缓存失效并重建。</summary>
+    private static string _cachedFolderName;
 
     /// <summary>
     /// 懒加载已翻译的 UI 记录进缓存（假定调用方已判定非默认语言）。
+    /// 切语言（auto.xml 换目录）后旧语言译文失效，必须清空重建，否则会返回错误语言的译文。
     /// </summary>
     private static void EnsureCache()
     {
-        if (_cacheLoaded)
+        string folder = LanguageDatabase.activeLanguage.folderName;
+        if (_cachedFolderName == folder)
         {
             return;
         }
 
-        _cacheLoaded = true;
+        UiCache.Clear();
+        _cachedFolderName = folder;
         foreach (KeyValuePair<string, AutoXmlWriter.AutoKeyEntry> kv in AutoXmlWriter.LoadAutoKeys())
         {
             if (kv.Value.Translated && !string.IsNullOrEmpty(kv.Value.Value))
@@ -139,12 +143,20 @@ public static class UiStringPatch
             AutoXmlWriter.WriteAutoKey(key, original, translated: false, overwrite: false);
             if (AutoTranslatorMod.RealtimeUpdateEnabled)
             {
+                // 捕获提交时的语言：切语言后旧任务回来不应污染新语言缓存。
+                string folderAtSubmit = LanguageDatabase.activeLanguage.folderName;
                 AutoTranslatorEngine.RequestTranslate(
                     key,
                     LanguageDatabase.defaultLanguage.folderName,
-                    LanguageDatabase.activeLanguage.folderName,
+                    folderAtSubmit,
                     original,
-                    (k, v) => { UiCache[k] = v; });
+                    (k, v) =>
+                    {
+                        if (LanguageDatabase.activeLanguage?.folderName == folderAtSubmit)
+                        {
+                            UiCache[k] = v;
+                        }
+                    });
             }
         }
 
