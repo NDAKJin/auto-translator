@@ -120,7 +120,7 @@ public static class AutoTranslatorEngine
             string translated = null;
             try
             {
-                TranslationResult result = _dispatcher.Translate(job.Source, job.Target, job.Key);
+                TranslationResult result = _dispatcher.Translate(job.Source, job.Target, job.Fallback);
                 if (result.Success && !string.IsNullOrEmpty(result.TranslatedText))
                 {
                     ok = true;
