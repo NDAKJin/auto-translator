@@ -109,21 +109,27 @@ public class AutoTranslatorMod : Mod
                 platformChecks[platformId] = enabled;
             }
 
-            // 下方凭据表格：已启用平台逐行设置访问键与密钥。
-            // 百度 APP ID 也视作访问键，统一标注，不做平台差异化。
+            // 下方凭据区域：每行凭据使用 TextEntryLabeled，
+            // label 自带"平台名 · 字段"标识，避免与全局表头混淆。
             listing.Gap(12f);
             listing.Label(AutoTranslatorSettings.CredentialTableHeaderKey.Translate());
-            listing.Label(AutoTranslatorSettings.AccessKeyLabelKey.Translate());
-            listing.Label(AutoTranslatorSettings.SecretKeyLabelKey.Translate());
 
             foreach (PlatformCredential cred in settings.Credentials)
             {
-                listing.Gap(6f);
-                string label = AutoTranslatorSettings.PlatformLabelKeys.TryGetValue(
+                listing.Gap(8f);
+
+                // 平台名（小标题）
+                string platformLabel = AutoTranslatorSettings.PlatformLabelKeys.TryGetValue(
                     cred.PlatformId, out string key) ? key.Translate() : cred.PlatformId;
-                listing.Label(label);
-                cred.AccessKey = listing.TextEntry(cred.AccessKey);
-                cred.SecretKey = listing.TextEntry(cred.SecretKey);
+                listing.Label(platformLabel);
+
+                // 访问键 + 密钥：两行 TextEntryLabeled，label 自带"平台名 · 字段"。
+                string accessKey = AutoTranslatorSettings.AccessKeyLabelKey.Translate();
+                string secretKey = AutoTranslatorSettings.SecretKeyLabelKey.Translate();
+                cred.AccessKey = listing.TextEntryLabeled(
+                    platformLabel + " · " + accessKey, cred.AccessKey);
+                cred.SecretKey = listing.TextEntryLabeled(
+                    platformLabel + " · " + secretKey, cred.SecretKey);
             }
 
             // 重置默认按钮：清空所有凭据与开关，恢复到首次安装时的初始状态。
