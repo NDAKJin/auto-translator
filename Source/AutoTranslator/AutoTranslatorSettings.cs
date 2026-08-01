@@ -107,7 +107,7 @@ public class AutoTranslatorSettings : ModSettings
     public const string CredentialTableHeaderKey = AutoTranslatorConstants.TranslationKeyPrefix + "CredentialTable";
 
     /// <summary>
-    /// 设置页凭据表格"访问键"列头的翻译键名（火山/阿里云通用）。
+    /// 设置页凭据表格"访问键"列头的翻译键名（三平台通用，百度 APP ID 也视作访问键）。
     /// </summary>
     public const string AccessKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "AccessKey";
 
@@ -115,28 +115,6 @@ public class AutoTranslatorSettings : ModSettings
     /// 设置页凭据表格"密钥"列头的翻译键名（三平台通用）。
     /// </summary>
     public const string SecretKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "SecretKey";
-
-    /// <summary>
-    /// 百度平台第一凭据字段（appid）的翻译键名。
-    /// 百度使用 APP ID + 密钥，而非 AccessKey/SecretKey。
-    /// </summary>
-    public const string BaiduAppIdLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "BaiduAppId";
-
-    /// <summary>
-    /// 各平台凭据表格"第一字段"标签键：百度指向 BaiduAppId，其余指向通用 AccessKey。
-    /// </summary>
-    private static readonly IReadOnlyDictionary<string, string> CredentialFirstFieldLabelKeys = new Dictionary<string, string>
-    {
-        { "Baidu", BaiduAppIdLabelKey }
-    };
-
-    /// <summary>
-    /// 获取指定平台凭据表格第一字段的标签键（百度为 APP ID，其余为访问键）。
-    /// </summary>
-    public static string GetCredentialFirstFieldLabelKey(string platformId)
-    {
-        return CredentialFirstFieldLabelKeys.TryGetValue(platformId, out string key) ? key : AccessKeyLabelKey;
-    }
 
     /// <summary>
     /// 已启用/配置的翻译平台凭据列表（动态增删）。

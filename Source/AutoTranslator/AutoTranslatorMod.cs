@@ -104,10 +104,12 @@ public class AutoTranslatorMod : Mod
             }
         }
 
-        // 下方凭据表格：已启用平台逐行设置凭据字段。
-        // 百度：APP ID + 密钥；火山/阿里云：访问键 + 密钥。
+        // 下方凭据表格：已启用平台逐行设置访问键与密钥。
+        // 百度 APP ID 也视作访问键，统一标注，不做平台差异化。
         listing.Gap(12f);
         listing.Label(AutoTranslatorSettings.CredentialTableHeaderKey.Translate());
+        listing.Label(AutoTranslatorSettings.AccessKeyLabelKey.Translate());
+        listing.Label(AutoTranslatorSettings.SecretKeyLabelKey.Translate());
 
         foreach (PlatformCredential cred in settings.Credentials)
         {
@@ -115,9 +117,7 @@ public class AutoTranslatorMod : Mod
             string label = AutoTranslatorSettings.PlatformLabelKeys.TryGetValue(
                 cred.PlatformId, out string key) ? key.Translate() : cred.PlatformId;
             listing.Label(label);
-            listing.Label(AutoTranslatorSettings.GetCredentialFirstFieldLabelKey(cred.PlatformId).Translate());
             cred.AccessKey = listing.TextEntry(cred.AccessKey);
-            listing.Label(AutoTranslatorSettings.SecretKeyLabelKey.Translate());
             cred.SecretKey = listing.TextEntry(cred.SecretKey);
         }
 
