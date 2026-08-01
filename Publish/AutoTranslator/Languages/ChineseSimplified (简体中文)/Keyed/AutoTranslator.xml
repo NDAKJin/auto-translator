@@ -5,7 +5,6 @@
   <AutoTranslator.ActiveLanguage>当前语言：{0}</AutoTranslator.ActiveLanguage>
   <AutoTranslator.DefaultLanguage>默认语言：{0}</AutoTranslator.DefaultLanguage>
   <AutoTranslator.EnableAutoTranslate>启用自动翻译</AutoTranslator.EnableAutoTranslate>
-  <AutoTranslator.EnableRealtimeUpdate>实时翻译</AutoTranslator.EnableRealtimeUpdate>
   <AutoTranslator.VolcengineAccessKey>火山引擎 AccessKey</AutoTranslator.VolcengineAccessKey>
   <AutoTranslator.VolcengineSecretKey>火山引擎 SecretKey</AutoTranslator.VolcengineSecretKey>
   <AutoTranslator.AliyunAccessKeyId>阿里云 AccessKeyId</AutoTranslator.AliyunAccessKeyId>

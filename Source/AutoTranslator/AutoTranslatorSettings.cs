@@ -51,27 +51,16 @@ public class AutoTranslatorSettings : ModSettings
         { "Baidu", AutoTranslatorConstants.TranslationKeyPrefix + "Baidu" }
     };
     /// <summary>
-    /// 是否启用自动翻译（总开关）。启用后必然记录未翻译 key，
+    /// 是否启用自动翻译（总开关）。启用后实时翻译并必然记录未翻译 key，
     /// 关闭后引擎停止、不再调用翻译 API、不再写新 key，
     /// 但本模组仍加载，已写入的 auto.xml 译文继续随语言包生效。
     /// </summary>
     public bool EnableAutoTranslate = true;
 
     /// <summary>
-    /// 是否实时翻译：开启时翻译失败立即请求翻译并写入 auto.xml；
-    /// 关闭时仅记录未翻译 key（回退原文），不实时翻译。
-    /// </summary>
-    public bool EnableRealtimeUpdate = true;
-
-    /// <summary>
     /// 设置持久化键名：是否启用自动翻译（总开关）。
     /// </summary>
     public const string EnableAutoTranslateScribeKey = "enableAutoTranslate";
-
-    /// <summary>
-    /// 设置持久化键名：是否实时更新未翻译字串。
-    /// </summary>
-    public const string EnableRealtimeUpdateScribeKey = "enableRealtimeUpdate";
 
     /// <summary>
     /// 设置页分类的翻译键名（SettingsCategory）。
@@ -92,11 +81,6 @@ public class AutoTranslatorSettings : ModSettings
     /// 设置页"是否启用自动翻译"复选框的翻译键名。
     /// </summary>
     public const string EnableAutoTranslateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableAutoTranslate";
-
-    /// <summary>
-    /// 设置页"是否实时翻译"复选框的翻译键名。
-    /// </summary>
-    public const string EnableRealtimeUpdateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableRealtimeUpdate";
 
     /// <summary>
     /// 设置页"可用平台"列表标题的翻译键名。
@@ -135,7 +119,6 @@ public class AutoTranslatorSettings : ModSettings
     {
         base.ExposeData();
         Scribe_Values.Look(ref EnableAutoTranslate, EnableAutoTranslateScribeKey, true);
-        Scribe_Values.Look(ref EnableRealtimeUpdate, EnableRealtimeUpdateScribeKey, true);
         Scribe_Collections.Look(ref credentials, "credentials", LookMode.Deep);
         // 读档失败时 Scribe 可能把 credentials 置 null，兜底重建空列表。
         if (credentials == null)
@@ -181,6 +164,5 @@ public class AutoTranslatorSettings : ModSettings
     {
         Credentials.Clear();
         EnableAutoTranslate = true;
-        EnableRealtimeUpdate = true;
     }
 }
