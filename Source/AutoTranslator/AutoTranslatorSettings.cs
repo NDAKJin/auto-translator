@@ -118,15 +118,28 @@ public class AutoTranslatorSettings : ModSettings
 
     /// <summary>
     /// 已启用/配置的翻译平台凭据列表（动态增删）。
+    /// 内部字段，对外通过 <see cref="Credentials"/> 属性访问，确保永不返回 null。
+    /// Scribe_Collections.Look 在读档失败时可能把引用置 null，故以属性兜底。
     /// </summary>
-    public List<PlatformCredential> Credentials = new List<PlatformCredential>();
+    private List<PlatformCredential> credentials;
+
+    /// <summary>
+    /// 已启用/配置的翻译平台凭据列表。永不为 null（读档失败时自动重建空列表）。
+    /// </summary>
+    public List<PlatformCredential> Credentials
+        => credentials ?? (credentials = new List<PlatformCredential>());
 
     public override void ExposeData()
     {
         base.ExposeData();
         Scribe_Values.Look(ref EnableKeyRecording, EnableKeyRecordingScribeKey, true);
         Scribe_Values.Look(ref EnableRealtimeUpdate, EnableRealtimeUpdateScribeKey, true);
-        Scribe_Collections.Look(ref Credentials, "credentials", LookMode.Deep);
+        Scribe_Collections.Look(ref credentials, "credentials", LookMode.Deep);
+        // 读档失败时 Scribe 可能把 credentials 置 null，兜底重建空列表。
+        if (credentials == null)
+        {
+            credentials = new List<PlatformCredential>();
+        }
     }
 
     /// <summary>是否已启用指定平台。</summary>
