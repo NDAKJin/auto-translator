@@ -22,8 +22,9 @@ namespace nomadicooer.AutoTranslator;
 /// </summary>
 public class AliyunTranslate : TranslatePlatform
 {
-    // 平台标识键名（由调用方负责翻译为显示名，本类不引用 RimWorld 翻译机制）
-    private const string PlatformNameKey = "AutoTranslator.Aliyun";
+    // 平台标识键名（由调用方负责翻译为显示名，本类不引用 RimWorld 翻译机制）。
+    // public 供 AutoTranslatorStartup 反射读取，按 cred.PlatformId 匹配实例化。
+    public const string PlatformNameKey = "AutoTranslator.Aliyun";
 
     private const string Host = "mt.cn-hangzhou.aliyuncs.com";
     private const string Endpoint = "https://" + Host + "/";

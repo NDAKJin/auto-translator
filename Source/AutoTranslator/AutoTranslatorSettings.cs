@@ -11,7 +11,7 @@ namespace nomadicooer.AutoTranslator;
 /// </summary>
 public class PlatformCredential : IExposable
 {
-    /// <summary>平台标识：Volcengine / Aliyun / Baidu。</summary>
+    /// <summary>平台标志：与各翻译引擎类的 PlatformNameKey 一致（如 "AutoTranslator.Volcengine"）。</summary>
     public string PlatformId;
 
     /// <summary>访问键（阿里云 AccessKeyId / 百度 APP ID / 火山 AccessKey）。</summary>
@@ -35,21 +35,17 @@ public class PlatformCredential : IExposable
 /// </summary>
 public class AutoTranslatorSettings : ModSettings
 {
-    /// <summary>支持的翻译平台标识集合（顺序即为设置页列表顺序）。</summary>
-    public static readonly IReadOnlyList<string> PlatformIds = new[]
-    {
-        "Volcengine",
-        "Aliyun",
-        "Baidu"
-    };
+    /// <summary>支持的翻译平台标识集合（顺序即为设置页列表顺序）。来源为各引擎类的 PlatformNameKey。</summary>
+    public static readonly IReadOnlyList<string> PlatformIds = PlatformRegistry.AllPlatformNameKeys;
 
-    /// <summary>各平台在设置页显示的翻译键名（key 为 PlatformId）。</summary>
-    public static readonly IReadOnlyDictionary<string, string> PlatformLabelKeys = new Dictionary<string, string>
-    {
-        { "Volcengine", AutoTranslatorConstants.TranslationKeyPrefix + "Volcengine" },
-        { "Aliyun", AutoTranslatorConstants.TranslationKeyPrefix + "Aliyun" },
-        { "Baidu", AutoTranslatorConstants.TranslationKeyPrefix + "Baidu" }
-    };
+    /// <summary>各平台在设置页显示的翻译键名（key 为 PlatformNameKey 平台标志）。</summary>
+    public static readonly IReadOnlyDictionary<string, string> PlatformLabelKeys = PlatformRegistry.LabelKeys;
+
+    /// <summary>
+    /// 平台标志（完整 PlatformNameKey，如 "AutoTranslator.Volcengine"）。
+    /// 与引擎类的 PlatformNameKey 保持一致，作为唯一平台标识。
+    /// </summary>
+    public const string PlatformNamePrefix = "AutoTranslator.";
     /// <summary>
     /// 是否启用自动翻译（总开关）。启用后实时翻译并必然记录未翻译 key，
     /// 关闭后引擎停止、不再调用翻译 API、不再写新 key，

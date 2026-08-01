@@ -20,8 +20,9 @@ namespace nomadicooer.AutoTranslator;
 /// </summary>
 public class VolcengineTranslate : TranslatePlatform
 {
-    // 平台标识键名（由调用方负责翻译为显示名，本类不引用 RimWorld 翻译机制）
-    private const string PlatformNameKey = "AutoTranslator.Volcengine";
+    // 平台标识键名（由调用方负责翻译为显示名，本类不引用 RimWorld 翻译机制）。
+    // public 供 AutoTranslatorStartup 反射读取，按 cred.PlatformId 匹配实例化。
+    public const string PlatformNameKey = "AutoTranslator.Volcengine";
 
     // 火山翻译 API 固定参数（cn-north-1 为机器翻译服务区）
     private const string Schema = "https";

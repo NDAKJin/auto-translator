@@ -13,6 +13,7 @@ public static class AutoTranslatorConstants
 
     /// <summary>
     /// 翻译键前缀。所有 Keyed 翻译键均以该前缀开头（对应 AutoTranslator.xml 中的键名）。
+    /// 各翻译引擎类的 PlatformNameKey 即由该前缀拼接平台短名构成，作为引擎的唯一标志。
     /// </summary>
     public const string TranslationKeyPrefix = "AutoTranslator.";
 
