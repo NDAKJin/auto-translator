@@ -56,6 +56,36 @@ public class AutoTranslatorSettings : ModSettings
     public const string EnableRealtimeUpdateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableRealtimeUpdate";
 
     /// <summary>
+    /// 设置页"火山引擎 AccessKey"文本框的翻译键名。
+    /// </summary>
+    public const string VolcengineAccessKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "VolcengineAccessKey";
+
+    /// <summary>
+    /// 设置页"火山引擎 SecretKey"文本框的翻译键名。
+    /// </summary>
+    public const string VolcengineSecretKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "VolcengineSecretKey";
+
+    /// <summary>
+    /// 设置页"阿里云 AccessKeyId"文本框的翻译键名。
+    /// </summary>
+    public const string AliyunAccessKeyIdLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "AliyunAccessKeyId";
+
+    /// <summary>
+    /// 设置页"阿里云 AccessKeySecret"文本框的翻译键名。
+    /// </summary>
+    public const string AliyunAccessKeySecretLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "AliyunAccessKeySecret";
+
+    /// <summary>
+    /// 设置页"百度 APP ID"文本框的翻译键名。
+    /// </summary>
+    public const string BaiduAppIdLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "BaiduAppId";
+
+    /// <summary>
+    /// 设置页"百度密钥"文本框的翻译键名。
+    /// </summary>
+    public const string BaiduSecretKeyLabelKey = AutoTranslatorConstants.TranslationKeyPrefix + "BaiduSecretKey";
+
+    /// <summary>
     /// 火山引擎 AccessKey，从设置界面输入，持久化保存。
     /// </summary>
     public string VolcengineAccessKey = string.Empty;
@@ -64,6 +94,26 @@ public class AutoTranslatorSettings : ModSettings
     /// 火山引擎 SecretKey，从设置界面输入，持久化保存。
     /// </summary>
     public string VolcengineSecretKey = string.Empty;
+
+    /// <summary>
+    /// 阿里云 AccessKeyId，从设置界面输入，持久化保存。
+    /// </summary>
+    public string AliyunAccessKeyId = string.Empty;
+
+    /// <summary>
+    /// 阿里云 AccessKeySecret，从设置界面输入，持久化保存。
+    /// </summary>
+    public string AliyunAccessKeySecret = string.Empty;
+
+    /// <summary>
+    /// 百度翻译 APP ID，从设置界面输入，持久化保存。
+    /// </summary>
+    public string BaiduAppId = string.Empty;
+
+    /// <summary>
+    /// 百度翻译密钥，从设置界面输入，持久化保存。
+    /// </summary>
+    public string BaiduSecretKey = string.Empty;
 
     /// <summary>
     /// 设置持久化键名：火山引擎 AccessKey。
@@ -75,6 +125,26 @@ public class AutoTranslatorSettings : ModSettings
     /// </summary>
     public const string VolcengineSecretKeyScribeKey = "volcengineSecretKey";
 
+    /// <summary>
+    /// 设置持久化键名：阿里云 AccessKeyId。
+    /// </summary>
+    public const string AliyunAccessKeyIdScribeKey = "aliyunAccessKeyId";
+
+    /// <summary>
+    /// 设置持久化键名：阿里云 AccessKeySecret。
+    /// </summary>
+    public const string AliyunAccessKeySecretScribeKey = "aliyunAccessKeySecret";
+
+    /// <summary>
+    /// 设置持久化键名：百度翻译 APP ID。
+    /// </summary>
+    public const string BaiduAppIdScribeKey = "baiduAppId";
+
+    /// <summary>
+    /// 设置持久化键名：百度翻译密钥。
+    /// </summary>
+    public const string BaiduSecretKeyScribeKey = "baiduSecretKey";
+
     public override void ExposeData()
     {
         base.ExposeData();
@@ -82,5 +152,9 @@ public class AutoTranslatorSettings : ModSettings
         Scribe_Values.Look(ref EnableRealtimeUpdate, EnableRealtimeUpdateScribeKey, true);
         Scribe_Values.Look(ref VolcengineAccessKey, VolcengineAccessKeyScribeKey, string.Empty);
         Scribe_Values.Look(ref VolcengineSecretKey, VolcengineSecretKeyScribeKey, string.Empty);
+        Scribe_Values.Look(ref AliyunAccessKeyId, AliyunAccessKeyIdScribeKey, string.Empty);
+        Scribe_Values.Look(ref AliyunAccessKeySecret, AliyunAccessKeySecretScribeKey, string.Empty);
+        Scribe_Values.Look(ref BaiduAppId, BaiduAppIdScribeKey, string.Empty);
+        Scribe_Values.Look(ref BaiduSecretKey, BaiduSecretKeyScribeKey, string.Empty);
     }
 }

@@ -27,6 +27,11 @@ public class AutoTranslatorMod : Mod
     /// </summary>
     public static bool RealtimeUpdateEnabled => Instance?.settings.EnableRealtimeUpdate ?? true;
 
+    /// <summary>
+    /// 模组设置实例（供启动初始化等静态上下文读取凭据等）。
+    /// </summary>
+    public static AutoTranslatorSettings Settings => Instance?.settings;
+
     public AutoTranslatorMod(ModContentPack content) : base(content)
     {
         Instance = this;
@@ -63,6 +68,25 @@ public class AutoTranslatorMod : Mod
         listing.CheckboxLabeled(
             AutoTranslatorSettings.EnableRealtimeUpdateKey.Translate(),
             ref settings.EnableRealtimeUpdate);
+
+        // 翻译平台凭据
+        listing.Label(AutoTranslatorSettings.VolcengineAccessKeyLabelKey.Translate());
+        settings.VolcengineAccessKey = listing.TextEntry(settings.VolcengineAccessKey);
+
+        listing.Label(AutoTranslatorSettings.VolcengineSecretKeyLabelKey.Translate());
+        settings.VolcengineSecretKey = listing.TextEntry(settings.VolcengineSecretKey);
+
+        listing.Label(AutoTranslatorSettings.AliyunAccessKeyIdLabelKey.Translate());
+        settings.AliyunAccessKeyId = listing.TextEntry(settings.AliyunAccessKeyId);
+
+        listing.Label(AutoTranslatorSettings.AliyunAccessKeySecretLabelKey.Translate());
+        settings.AliyunAccessKeySecret = listing.TextEntry(settings.AliyunAccessKeySecret);
+
+        listing.Label(AutoTranslatorSettings.BaiduAppIdLabelKey.Translate());
+        settings.BaiduAppId = listing.TextEntry(settings.BaiduAppId);
+
+        listing.Label(AutoTranslatorSettings.BaiduSecretKeyLabelKey.Translate());
+        settings.BaiduSecretKey = listing.TextEntry(settings.BaiduSecretKey);
 
         listing.End();
     }

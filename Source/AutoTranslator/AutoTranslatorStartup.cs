@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Verse;
 using HarmonyLib;
 
@@ -22,5 +23,33 @@ public static class AutoTranslatorStartup
 
         Harmony = new Harmony(AutoTranslatorConstants.ModId);
         Harmony.PatchAll();
+
+        // 构建翻译调度器：仅注册已在设置中填入凭据的平台，避免空凭据打 API 浪费。
+        var settings = AutoTranslatorMod.Settings;
+        if (settings != null)
+        {
+            var sources = new List<TranslatePlatform>();
+            if (!string.IsNullOrEmpty(settings.VolcengineAccessKey) && !string.IsNullOrEmpty(settings.VolcengineSecretKey))
+            {
+                sources.Add(new VolcengineTranslate(settings.VolcengineAccessKey, settings.VolcengineSecretKey));
+            }
+            if (!string.IsNullOrEmpty(settings.AliyunAccessKeyId) && !string.IsNullOrEmpty(settings.AliyunAccessKeySecret))
+            {
+                sources.Add(new AliyunTranslate(settings.AliyunAccessKeyId, settings.AliyunAccessKeySecret));
+            }
+            if (!string.IsNullOrEmpty(settings.BaiduAppId) && !string.IsNullOrEmpty(settings.BaiduSecretKey))
+            {
+                sources.Add(new BaiduTranslate(settings.BaiduAppId, settings.BaiduSecretKey));
+            }
+
+            if (sources.Count > 0)
+            {
+                AutoTranslatorEngine.Configure(new TranslationDispatcher(sources));
+            }
+            else
+            {
+                Logger.Warning("未配置任何翻译平台凭据，自动翻译引擎未启动。");
+            }
+        }
     }
 }

@@ -36,7 +36,15 @@ public static class TranslationPatch
         }
         TaggedString saveresult;
         LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out saveresult);
+        // 记录原文的未翻译 key 到 auto.xml（持久化，供补译参考）。
         WriteAutoKey(key, saveresult);
+
+        // 提交异步翻译：后台线程翻译完成后实时回写 RimWorld 字典，下次查询即命中。
+        // source 固定为默认语言（英文），target 为当前激活语言。
+        AutoTranslatorEngine.RequestTranslate(
+            key,
+            LanguageDatabase.defaultLanguage.folderName,
+            LanguageDatabase.activeLanguage.folderName);
     }
 
     private static void WriteAutoKey(string key, string originalKey)

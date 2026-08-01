@@ -6,6 +6,12 @@
   <AutoTranslator.DefaultLanguage>Default language: {0}</AutoTranslator.DefaultLanguage>
   <AutoTranslator.EnableKeyRecording>Record untranslated keys</AutoTranslator.EnableKeyRecording>
   <AutoTranslator.EnableRealtimeUpdate>Real-time translation</AutoTranslator.EnableRealtimeUpdate>
+  <AutoTranslator.VolcengineAccessKey>Volcengine AccessKey</AutoTranslator.VolcengineAccessKey>
+  <AutoTranslator.VolcengineSecretKey>Volcengine SecretKey</AutoTranslator.VolcengineSecretKey>
+  <AutoTranslator.AliyunAccessKeyId>Aliyun AccessKeyId</AutoTranslator.AliyunAccessKeyId>
+  <AutoTranslator.AliyunAccessKeySecret>Aliyun AccessKeySecret</AutoTranslator.AliyunAccessKeySecret>
+  <AutoTranslator.BaiduAppId>Baidu APP ID</AutoTranslator.BaiduAppId>
+  <AutoTranslator.BaiduSecretKey>Baidu SecretKey</AutoTranslator.BaiduSecretKey>
   <AutoTranslator.Volcengine>Volcengine</AutoTranslator.Volcengine>
   <AutoTranslator.Baidu>Baidu</AutoTranslator.Baidu>
   <AutoTranslator.Aliyun>Aliyun</AutoTranslator.Aliyun>
