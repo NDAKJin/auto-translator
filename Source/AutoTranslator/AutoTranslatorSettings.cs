@@ -15,9 +15,20 @@ public class AutoTranslatorSettings : ModSettings
     public bool EnableKeyRecording = true;
 
     /// <summary>
+    /// 是否实时更新未翻译字串：开启时翻译失败立即写入 auto.xml；
+    /// 关闭时仅回退显示、不记录未翻译 key。
+    /// </summary>
+    public bool EnableRealtimeUpdate = true;
+
+    /// <summary>
     /// 设置持久化键名：是否启用翻译键记录。
     /// </summary>
     public const string EnableKeyRecordingScribeKey = "enableKeyRecording";
+
+    /// <summary>
+    /// 设置持久化键名：是否实时更新未翻译字串。
+    /// </summary>
+    public const string EnableRealtimeUpdateScribeKey = "enableRealtimeUpdate";
 
     /// <summary>
     /// 设置页分类的翻译键名（SettingsCategory）。
@@ -38,6 +49,11 @@ public class AutoTranslatorSettings : ModSettings
     /// 设置页"是否启用翻译键记录"复选框的翻译键名。
     /// </summary>
     public const string EnableKeyRecordingKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableKeyRecording";
+
+    /// <summary>
+    /// 设置页"是否实时更新未翻译字串"复选框的翻译键名。
+    /// </summary>
+    public const string EnableRealtimeUpdateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableRealtimeUpdate";
 
     /// <summary>
     /// 火山引擎 AccessKey，从设置界面输入，持久化保存。
@@ -63,6 +79,7 @@ public class AutoTranslatorSettings : ModSettings
     {
         base.ExposeData();
         Scribe_Values.Look(ref EnableKeyRecording, EnableKeyRecordingScribeKey, true);
+        Scribe_Values.Look(ref EnableRealtimeUpdate, EnableRealtimeUpdateScribeKey, true);
         Scribe_Values.Look(ref VolcengineAccessKey, VolcengineAccessKeyScribeKey, string.Empty);
         Scribe_Values.Look(ref VolcengineSecretKey, VolcengineSecretKeyScribeKey, string.Empty);
     }

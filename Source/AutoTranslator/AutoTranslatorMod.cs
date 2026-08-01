@@ -22,6 +22,11 @@ public class AutoTranslatorMod : Mod
     /// </summary>
     public static bool KeyRecordingEnabled => Instance?.settings.EnableKeyRecording ?? true;
 
+    /// <summary>
+    /// 是否实时更新未翻译字串（供 TranslationPatch 在静态上下文读取）。
+    /// </summary>
+    public static bool RealtimeUpdateEnabled => Instance?.settings.EnableRealtimeUpdate ?? true;
+
     public AutoTranslatorMod(ModContentPack content) : base(content)
     {
         Instance = this;
@@ -53,6 +58,11 @@ public class AutoTranslatorMod : Mod
         listing.CheckboxLabeled(
             AutoTranslatorSettings.EnableKeyRecordingKey.Translate(),
             ref settings.EnableKeyRecording);
+
+        // 是否实时更新未翻译字串
+        listing.CheckboxLabeled(
+            AutoTranslatorSettings.EnableRealtimeUpdateKey.Translate(),
+            ref settings.EnableRealtimeUpdate);
 
         listing.End();
     }
