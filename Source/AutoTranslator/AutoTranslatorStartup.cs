@@ -99,11 +99,18 @@ public static class AutoTranslatorStartup
         Harmony = new Harmony(AutoTranslatorConstants.ModId);
         Harmony.PatchAll();
 
-        // 构建翻译调度器：仅注册已在设置中填入凭据的平台，避免空凭据打 API 浪费。
-        // 总开关关闭时（EnableAutoTranslate=false）不启动引擎：不再调用翻译 API、不再写新 key，
+        // 引擎启动条件：总开关开启 + 实时翻译开启。
+        // 实时翻译开启时 TranslationPatch 会调用 Engine.RequestTranslate，引擎必须在线（后台消费线程在跑），
+        // 否则未翻译 key 既不会被实时翻译、也不会被记录到 auto.xml。
+        // 引擎启动不依赖"是否配置了平台凭据"：未配凭据时 dispatcher 带空源集合构造，
+        // 翻译请求会因 _sources.Count==0 安全返回失败原文，不会崩溃；
+        // 若等到玩家补配凭据并重启，引擎自然获得真实翻译能力。
+        // 总开关关闭（EnableAutoTranslate=false）时不启动引擎：不再调用翻译 API、不再写新 key，
         // 但本模组仍加载，已写入的 auto.xml 译文继续随语言包生效。
+        // 实时翻译关闭（RealtimeUpdateEnabled=false）时，未翻译 key 由 TranslationPatch 直接写 auto.xml，
+        // 不经过引擎，故无需启动后台线程。
         var settings = AutoTranslatorMod.Settings;
-        if (settings != null && AutoTranslatorMod.AutoTranslateEnabled)
+        if (settings != null && AutoTranslatorMod.AutoTranslateEnabled && AutoTranslatorMod.RealtimeUpdateEnabled)
         {
             var sources = new List<TranslatePlatform>();
             foreach (PlatformCredential cred in settings.Credentials)
@@ -121,13 +128,12 @@ public static class AutoTranslatorStartup
                 }
             }
 
-            if (sources.Count > 0)
+            // 始终启动引擎（无论是否配置了平台凭据）；dispatcher 接受空源集合。
+            AutoTranslatorEngine.Configure(new TranslationDispatcher(sources));
+
+            if (sources.Count == 0)
             {
-                AutoTranslatorEngine.Configure(new TranslationDispatcher(sources));
-            }
-            else
-            {
-                Logger.Warning("未配置任何翻译平台凭据，自动翻译引擎未启动。");
+                Logger.Warning("未配置任何翻译平台凭据，自动翻译引擎已启动但翻译不会生效（需配置凭据后重启）。");
             }
         }
     }
