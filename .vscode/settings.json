@@ -1,0 +1,12 @@
+{
+  // 让 C# 语言服务器自动加载工作区内的项目（含新增加的 .cs 文件，减少未被纳入分析的情况）
+  "dotnet.projects.autoLoad": true,
+
+  // OmniSharp 兼容项：开启 Roslyn 分析器与导入补全，确保跨文件符号正确解析
+  "omnisharp.enableRoslynAnalyzers": true,
+  "omnisharp.enableEditorConfigSupport": true,
+
+  // 不自动格式化，避免与根目录 .editorconfig 的命名空间规则冲突
+  "omnisharp.formattingOptions": {},
+  "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true
+}

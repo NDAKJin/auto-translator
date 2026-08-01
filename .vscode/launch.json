@@ -1,0 +1,14 @@
+{
+  // 通过 Doorstop 启用的 Mono 调试服务器，附加到 RimWorld 进程进行联调。
+  // 使用微软官方 VisualStudioToolsForUnity 扩展（type=vstuc）。
+  // endPoint 须与游戏目录 doorstop_config.ini 的 [UnityMono] debug_address 一致（此处 127.0.0.1:56000）。
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach to RimWorld (Doorstop)",
+      "type": "vstuc",
+      "request": "attach",
+      "endPoint": "127.0.0.1:56000"
+    }
+  ]
+}

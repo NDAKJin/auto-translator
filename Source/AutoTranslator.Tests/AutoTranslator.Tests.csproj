@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- 纯逻辑测试：单目标 net9.0，不引用 RimWorld/Unity 程序集 -->
+    <TargetFramework>net9.0</TargetFramework>
+    <AssemblyName>AutoTranslator.Tests</AssemblyName>
+    <RootNamespace>AutoTranslator.Tests</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 测试框架 -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.13.2" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <!-- 被测试的纯逻辑源码（与模组主工程共享，不依赖 RimWorld） -->
+  <ItemGroup>
+    <Compile Include="..\AutoTranslator\NameListParser.cs" />
+  </ItemGroup>
+
+</Project>
