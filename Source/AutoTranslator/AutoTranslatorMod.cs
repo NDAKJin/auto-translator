@@ -197,38 +197,39 @@ public class AutoTranslatorMod : Mod
 
     /// <summary>
     /// 绘制加粗放大的可折叠 section 标题：左侧 ▶/▼ 三角形指示折叠状态，
-    /// 整行可点击切换 bool 折叠状态。settings 字段为 ref，运行时切换即生效。
+    /// 三角形区域可点击切换 bool 折叠状态。settings 字段为 ref，运行时切换即生效。
+    /// 使用 Verse 内置贴图 TexButton.Reveal（折叠中）/ Collapse（展开），
+    /// 与游戏原生 UI 风格一致。
     /// </summary>
     private static void DrawCollapsibleSectionHeader(
         Listing_Standard listing, AutoTranslatorSettings settings, string text)
     {
-        const float TriangleWidth = 18f;
+        const float TriangleWidth = 24f;
         const float HeaderHeight = 30f;
         UnityEngine.Rect rect = listing.GetRect(HeaderHeight);
         GameFont previous = Text.Font;
         Text.Font = GameFont.Medium;
         try
         {
-            // 左侧三角形（▶ 折叠中 / ▼ 展开）
+            // 左侧三角形（TexButton.Reveal 向右 ▶=折叠中；Collapse 向下 ▼=展开）
             UnityEngine.Rect triangleRect = new UnityEngine.Rect(
-                rect.x, rect.y, TriangleWidth, rect.height);
-            Widgets.Label(
-                triangleRect,
-                settings.CredentialsCollapsed ? "▶" : "▼");
-
-            // 右侧标题文字
-            UnityEngine.Rect textRect = new UnityEngine.Rect(
-                rect.x + TriangleWidth,
-                rect.y,
-                rect.width - TriangleWidth,
-                rect.height);
-            Widgets.Label(textRect, text);
-
-            // 整行可点击：仅在鼠标按下时切换（ButtonInvisible 会消费点击事件）
-            if (Widgets.ButtonInvisible(rect))
+                rect.x,
+                rect.y + (rect.height - TriangleWidth) / 2f,
+                TriangleWidth, TriangleWidth);
+            if (Widgets.ButtonImage(
+                    triangleRect,
+                    settings.CredentialsCollapsed ? TexButton.Reveal : TexButton.Collapse))
             {
                 settings.CredentialsCollapsed = !settings.CredentialsCollapsed;
             }
+
+            // 右侧标题文字（仅显示，不可点击，避免与三角形 ButtonImage 冲突）
+            UnityEngine.Rect textRect = new UnityEngine.Rect(
+                rect.x + TriangleWidth + 6f,
+                rect.y,
+                rect.width - TriangleWidth - 6f,
+                rect.height);
+            Widgets.Label(textRect, text);
         }
         finally
         {
