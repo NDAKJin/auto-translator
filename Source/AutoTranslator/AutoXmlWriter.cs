@@ -14,7 +14,7 @@ namespace nomadicooer.AutoTranslator;
 /// 引擎据此判断是否需要翻译：value 与默认语言内容相同即为"未翻译"，需调 API。
 /// 作为独立底层工具供 AutoTranslatorEngine（后台线程）单向依赖，
 /// 避免 TranslationPatch 与 AutoTranslatorEngine 互相引用。
-/// 包含默认语言 English：英文下 value 即英文原文，供收集未翻译 key。
+/// 默认语言 English（激活语言即默认语言）不写文件：英文地区无需翻译。
 /// </summary>
 public static class AutoXmlWriter
 {
@@ -36,12 +36,14 @@ public static class AutoXmlWriter
         }
     }
 
-    // 当前激活语言包对应的 Keyed 目录（含默认语言 English）。auto.xml 存于此。
+    // 当前激活语言包对应的 Keyed 目录。默认语言 English（激活语言==默认语言）直接返回 null 跳过：
+    // 英文地区无需翻译，不拦截、不写文件。
     private static string KeyedDir
     {
         get
         {
-            if (LanguageDatabase.activeLanguage == null)
+            if (LanguageDatabase.activeLanguage == null
+                || LanguageDatabase.activeLanguage.folderName == LanguageDatabase.DefaultLangFolderName)
             {
                 return null;
             }

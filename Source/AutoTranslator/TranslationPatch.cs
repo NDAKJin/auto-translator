@@ -22,7 +22,8 @@ public static class TranslationPatch
     {
         if (__result || key == null
             || !AutoTranslatorMod.AutoTranslateEnabled
-            || LanguageDatabase.activeLanguage == null)
+            || LanguageDatabase.activeLanguage == null
+            || LanguageDatabase.activeLanguage == LanguageDatabase.defaultLanguage)
         {
             return;
         }
