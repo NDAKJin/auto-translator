@@ -23,7 +23,7 @@ public class AutoTranslatorMod : Mod
     public static bool KeyRecordingEnabled => Instance?.settings.EnableKeyRecording ?? true;
 
     /// <summary>
-    /// 是否实时更新未翻译字串（供 TranslationPatch 在静态上下文读取）。
+    /// 是否实时翻译（供 TranslationPatch 在静态上下文读取）。
     /// </summary>
     public static bool RealtimeUpdateEnabled => Instance?.settings.EnableRealtimeUpdate ?? true;
 

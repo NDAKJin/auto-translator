@@ -5,7 +5,7 @@
   <AutoTranslator.ActiveLanguage>Active language: {0}</AutoTranslator.ActiveLanguage>
   <AutoTranslator.DefaultLanguage>Default language: {0}</AutoTranslator.DefaultLanguage>
   <AutoTranslator.EnableKeyRecording>Record untranslated keys</AutoTranslator.EnableKeyRecording>
-  <AutoTranslator.EnableRealtimeUpdate>Update untranslated strings in real time</AutoTranslator.EnableRealtimeUpdate>
+  <AutoTranslator.EnableRealtimeUpdate>Real-time translation</AutoTranslator.EnableRealtimeUpdate>
   <AutoTranslator.Volcengine>Volcengine</AutoTranslator.Volcengine>
   <AutoTranslator.Baidu>Baidu</AutoTranslator.Baidu>
   <AutoTranslator.Aliyun>Aliyun</AutoTranslator.Aliyun>

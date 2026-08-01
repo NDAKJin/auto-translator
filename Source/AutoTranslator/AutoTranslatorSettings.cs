@@ -15,7 +15,7 @@ public class AutoTranslatorSettings : ModSettings
     public bool EnableKeyRecording = true;
 
     /// <summary>
-    /// 是否实时更新未翻译字串：开启时翻译失败立即写入 auto.xml；
+    /// 是否实时翻译：开启时翻译失败立即写入 auto.xml；
     /// 关闭时仅回退显示、不记录未翻译 key。
     /// </summary>
     public bool EnableRealtimeUpdate = true;
@@ -51,7 +51,7 @@ public class AutoTranslatorSettings : ModSettings
     public const string EnableKeyRecordingKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableKeyRecording";
 
     /// <summary>
-    /// 设置页"是否实时更新未翻译字串"复选框的翻译键名。
+    /// 设置页"是否实时翻译"复选框的翻译键名。
     /// </summary>
     public const string EnableRealtimeUpdateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableRealtimeUpdate";
 
