@@ -1,0 +1,8 @@
+root = true
+
+[*.cs]
+# 关闭「命名空间应与文件夹结构匹配」的诊断（IDE0130）
+dotnet_diagnostic.IDE0130.severity = none
+
+# 使用文件范围限定的命名空间（file-scoped）；不匹配的提示不显示为错误
+csharp_style_namespace_declarations = file_scoped:none

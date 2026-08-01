@@ -3,9 +3,7 @@
   <packageId>nomadicooer.AutoTranslator</packageId>
   <name>AutoTranslator</name>
   <author>nomadicooer</author>
-  <description>
-    An automatic translation mod
-  </description>
+  <description>An automatic translation mod.</description>
   <modDependencies>
     <li>
       <packageId>brrainz.harmony</packageId>

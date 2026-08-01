@@ -19,9 +19,4 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
 
-  <!-- 被测试的纯逻辑源码（与模组主工程共享，不依赖 RimWorld） -->
-  <ItemGroup>
-    <Compile Include="..\AutoTranslator\NameListParser.cs" />
-  </ItemGroup>
-
 </Project>

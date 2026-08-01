@@ -3,6 +3,7 @@ Source/**/bin/
 Source/**/obj/
 Publish/AutoTranslator/1.6/Assemblies/
 data/
+build.log
 
 # 本地符号链接目录（不随仓库提交，需各自机器重建）
 Extends/

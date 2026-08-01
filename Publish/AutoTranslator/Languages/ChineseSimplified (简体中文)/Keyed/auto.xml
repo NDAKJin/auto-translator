@@ -1,0 +1,124 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <PLFILT_FilteredTilesCleared>Filtered tiles cleared.</PLFILT_FilteredTilesCleared>
+  <PLFILT_NewWorld>New World</PLFILT_NewWorld>
+  <PreFilteringWorldTiles>PreFilteringWorldTiles</PreFilteringWorldTiles>
+  <PLFILT_PreFiltering>PreFiltering</PLFILT_PreFiltering>
+  <PLFILT_ValidTilesRemainAfterFilter>Pre-filter: {0} valid tile(s) remain(s) after filtering ({1} tile(s) removed).</PLFILT_ValidTilesRemainAfterFilter>
+  <PLFILT_TilesWithRiver>Pre-filter: {0} tiles with at least one river.</PLFILT_TilesWithRiver>
+  <PLFILT_TilesWithRoad>Pre-filter: {0} tiles with at least one road.</PLFILT_TilesWithRoad>
+  <PLMWMINW_MinmizedWindow>Minimized Window</PLMWMINW_MinmizedWindow>
+  <PLMWFTIL_GoToStartOfTileList>Go to the start of the tile list.</PLMWFTIL_GoToStartOfTileList>
+  <PLMWFTIL_GoToPreviousListPage>Go to previous page of the list.</PLMWFTIL_GoToPreviousListPage>
+  <PLMWFTIL_GoToNextListPage>Go to next page of the list.</PLMWFTIL_GoToNextListPage>
+  <PLMWFTIL_GoToEndOfList>Go to the end of the tile list.</PLMWFTIL_GoToEndOfList>
+  <PLMWLODSAV_GoToStartOfItemList>Go to the start of the item list.</PLMWLODSAV_GoToStartOfItemList>
+  <PLMWLODSAV_GoToPreviousListPage>Go to previous page of the list.</PLMWLODSAV_GoToPreviousListPage>
+  <PLMWLODSAV_GoToNextListPage>Go to next page of the list.</PLMWLODSAV_GoToNextListPage>
+  <PLMWLODSAV_GoToEndOfList>Go to the end of the items list.</PLMWLODSAV_GoToEndOfList>
+  <PLMWTT_TabName>Terrain</PLMWTT_TabName>
+  <PLMWTF_TabName>Features</PLMWTF_TabName>
+  <PLMWT2T_TabName_1_6>Climate</PLMWT2T_TabName_1_6>
+  <PLMWFTIL_FilteredTiles>Filtered Tiles</PLMWFTIL_FilteredTiles>
+  <PLMWINF_WorldInfo>World Info</PLMWINF_WorldInfo>
+  <PLOPT_Options>Options</PLOPT_Options>
+  <PLMWLODSAV_Load>Load</PLMWLODSAV_Load>
+  <PLMWLODSAV_Save>Save</PLMWLODSAV_Save>
+  <PLMWBB_FilterTiles>Filter Tiles</PLMWBB_FilterTiles>
+  <PLMWBB_ResetFilters>Reset Filters</PLMWBB_ResetFilters>
+  <PLMWBB_Minimize>Minimize</PLMWBB_Minimize>
+  <PLMWBB_SelectRandom>Select Random</PLMWBB_SelectRandom>
+  <PLMWBB_LoadSave>Load / Save</PLMWBB_LoadSave>
+  <PLMWBB_LoadOrSaveFilterPresets>Load or Save Filter Presets.</PLMWBB_LoadOrSaveFilterPresets>
+  <PLMWBB_SelectAction>Select Action</PLMWBB_SelectAction>
+  <PLMWTT_BiomeTypes>Biome Types</PLMWTT_BiomeTypes>
+  <PLMWTT_SelectBiome>Select Biome</PLMWTT_SelectBiome>
+  <PLMW_SelectAny>Any</PLMW_SelectAny>
+  <PLMWTT_TerrainTypes>Terrain Types</PLMWTT_TerrainTypes>
+  <PLMWTT_SelectTerrain>Select Terrain</PLMWTT_SelectTerrain>
+  <PLMWTT_RoadTypes>Road Types</PLMWTT_RoadTypes>
+  <PLMW_Reset>Reset</PLMW_Reset>
+  <PLMWTT_ButtonResetTooltip>Reset all elements to their default (Partial) state.</PLMWTT_ButtonResetTooltip>
+  <PLMW_All>All</PLMW_All>
+  <PLMWTT_ButtonAllTooltip>Set all elements to the On state.</PLMWTT_ButtonAllTooltip>
+  <PLMW_None>None</PLMW_None>
+  <PLMWTT_ButtonNoneTooltip>Set all elements to the Off state.</PLMWTT_ButtonNoneTooltip>
+  <PLMWTT_FilterBooleanAnd>AND</PLMWTT_FilterBooleanAnd>
+  <PLMWTT_ORANDTooltip>Type of filtering to apply.
+OR: each item is evaluated independently.
+AND: all items are evaluated together.</PLMWTT_ORANDTooltip>
+  <PLMWTT_RiverTypes>River Types</PLMWTT_RiverTypes>
+  <PLINT_UsableMinMaxNumFieldMin>Min</PLINT_UsableMinMaxNumFieldMin>
+  <PLINT_UsableMinMaxNumFieldMax>Max</PLINT_UsableMinMaxNumFieldMax>
+  <PLINT_UsableMinMaxNumFieldUse>Use</PLINT_UsableMinMaxNumFieldUse>
+  <PLMW_Meter>Meter</PLMW_Meter>
+  <PLMWTT_CoastalTiles>Coastal Tiles</PLMWTT_CoastalTiles>
+  <PLMWTT_IsCoastalTileOcean>Is Coastal Tile (ocean)</PLMWTT_IsCoastalTileOcean>
+  <PLMWTT_UseCoastalRoation>Use Coastal Rotation</PLMWTT_UseCoastalRoation>
+  <PLMWTT_UseCoastalRoationTooltip>Allow to search for coastal ocean/sea tiles which have a coast facing a specific direction.</PLMWTT_UseCoastalRoationTooltip>
+  <PLMWTT_SelectCoastRotation>Select Coast Rotation</PLMWTT_SelectCoastRotation>
+  <PLMWTT_SelectedCoastRotation>Selected Coast Rotation</PLMWTT_SelectedCoastRotation>
+  <PLMWTT_IsCoastalTileLakeTooltip>A lake is at most 15 tiles of water surrounded by land.</PLMWTT_IsCoastalTileLakeTooltip>
+  <PLMWTT_IsCoastalTileLake>Is Coastal Tile (lake)</PLMWTT_IsCoastalTileLake>
+  <PLMWTT_StoneTypes>Stone Types</PLMWTT_StoneTypes>
+  <PLMWTT_StoneOrderTooltip> Whether Stone Filtering is order dependent or not.
+Press button to change filter state.</PLMWTT_StoneOrderTooltip>
+  <PLMWTT_NoOrder>No Order</PLMWTT_NoOrder>
+  <PLMWTT_Filter>Filter</PLMWTT_Filter>
+  <PLMWTT_UseNumberOfStoneTypes>Use # of stone types [2,3]</PLMWTT_UseNumberOfStoneTypes>
+  <PLMWTT_UseNumberOfStoneTypesToolTip>Filter tiles that have only the given number of stone types (whatever the types are). This disables the other stone filters.</PLMWTT_UseNumberOfStoneTypesToolTip>
+  <PLMWTT_SelectBiomeType>Select Biome Type</PLMWTT_SelectBiomeType>
+  <PLMWTF_Features>Map Features</PLMWTF_Features>
+  <PLMWTF_AdjBiomes>Adjacent Biomes</PLMWTF_AdjBiomes>
+  <PLMWT2T_MostLeastCharacteristics>Highest / Lowest Characteristics</PLMWT2T_MostLeastCharacteristics>
+  <PLMWT2T_MostLeastSelectCharacteristic>Select a Characteristic</PLMWT2T_MostLeastSelectCharacteristic>
+  <PLMWT2T_MostLeastNumberOfTiles>Number of Tiles</PLMWT2T_MostLeastNumberOfTiles>
+  <PLMWT2T_MostLeastSelectCharacteristicType>Select Characteristic Type</PLMWT2T_MostLeastSelectCharacteristicType>
+  <PLMWT2T_MostLeastPressButtonFirst>Press the "{0}" button first.</PLMWT2T_MostLeastPressButtonFirst>
+  <PLMWT2T_MostLeastResult>Result</PLMWT2T_MostLeastResult>
+  <PLMWT2T_WorldFeatureSelection>World Feature Selection</PLMWT2T_WorldFeatureSelection>
+  <PLMWT2T_SelectWorldFeature>Select World Feature</PLMWT2T_SelectWorldFeature>
+  <PLMWT2T_WorldFeature>World Feature</PLMWT2T_WorldFeature>
+  <PLMWT2T_CoordinatesWindow>Coordinates Window</PLMWT2T_CoordinatesWindow>
+  <PLMWT2T_OpenCoordinatesWindow>Open Coordinates Window</PLMWT2T_OpenCoordinatesWindow>
+  <PLMWT2T_RainfallMillimeters>mm</PLMWT2T_RainfallMillimeters>
+  <PLMWT2T_TemperatureForecast>Temperature Forecast</PLMWT2T_TemperatureForecast>
+  <PLMWT2T_TempPickTileOnWorldMap>Pick a tile on the world map!</PLMWT2T_TempPickTileOnWorldMap>
+  <PLMWFTIL_SelectedTileInfo>Selected Tile Information</PLMWFTIL_SelectedTileInfo>
+  <PLMWINF_PlanetName>Planet Name</PLMWINF_PlanetName>
+  <PLMWINF_TotalTiles>Total Tiles</PLMWINF_TotalTiles>
+  <PLMWINF_SettleableTiles>Settleable Tiles</PLMWINF_SettleableTiles>
+  <PLMWINF_TilesWithRivers>Tiles with Rivers</PLMWINF_TilesWithRivers>
+  <PLMWINF_TilesWithRoads>Tiles with Roads</PLMWINF_TilesWithRoads>
+  <PLMWINF_Biomes>Biomes</PLMWINF_Biomes>
+  <PLMWINF_NumberOfTiles>Number of Tiles</PLMWINF_NumberOfTiles>
+  <PLMWINF_WorldRecords>World Records</PLMWINF_WorldRecords>
+  <PLMWINF_WorldLowest>World Lowest</PLMWINF_WorldLowest>
+  <PLMWINF_WorldHighest>World Highest</PLMWINF_WorldHighest>
+  <PLMWINF_FilterInfo>Filter Information</PLMWINF_FilterInfo>
+  <PLMWINF_ClearInfo>Clear Information</PLMWINF_ClearInfo>
+  <PLOPT_FilterOptions>Filter Options</PLOPT_FilterOptions>
+  <PLOPT_AllowLiveFiltering>Allow Live Filtering</PLOPT_AllowLiveFiltering>
+  <PLOPT_AllowLiveFilteringToolTip>[Warning: CPU heavy] Allow filtering without pressing the "Filter" button.</PLOPT_AllowLiveFilteringToolTip>
+  <PLOPT_AllowImpassableTiles>Allow Impassable Tiles</PLOPT_AllowImpassableTiles>
+  <PLOPT_AllowImpassableTilesToolTip>Allow selection and filtering of impassable tiles.</PLOPT_AllowImpassableTilesToolTip>
+  <PLOPT_DisablePreFilterCheck>Disable PreFilter Check</PLOPT_DisablePreFilterCheck>
+  <PLOPT_DisablePreFilterCheckToolTip>Disable the check where Biomes and Terrains must be selected with a world coverage &gt;= 50%.</PLOPT_DisablePreFilterCheckToolTip>
+  <PLOPT_ViewPartialOffNoSelect>View PartialOffNoSelect</PLOPT_ViewPartialOffNoSelect>
+  <PLOPT_ViewPartialOffNoSelectToolTip>Allow to view the PartialOffNoSelect button on the GUI for grouped three state items.</PLOPT_ViewPartialOffNoSelectToolTip>
+  <PLOPT_ResetAllFiltersOnNewWorld>Reset all filters on new world</PLOPT_ResetAllFiltersOnNewWorld>
+  <PLOPT_ResetAllFiltersOnNewWorldToolTip>If ON, all filters are reset to their default state on a new generated world, otherwise the filters are kept in their previous state.</PLOPT_ResetAllFiltersOnNewWorldToolTip>
+  <PLOPT_ShowFilterHeaviness>Show Filter Heaviness</PLOPT_ShowFilterHeaviness>
+  <PLOPT_ShowFilterHeavinessToolTip>Show filter heaviness (possible filter CPU calculation heaviness) on filter header in the GUI.</PLOPT_ShowFilterHeavinessToolTip>
+  <PLOPT_AllowInvalidTilesForNewSettlement>Allow Invalid Tiles for New Settlement</PLOPT_AllowInvalidTilesForNewSettlement>
+  <PLOPT_AllowInvalidTilesForNewSettlementToolTip>If ON, this prevents a last pass that would have removed tiles deemed as not valid for a new settlement.</PLOPT_AllowInvalidTilesForNewSettlementToolTip>
+  <PLOPT_TileHighlighterOptions>Tile Highlighter Options</PLOPT_TileHighlighterOptions>
+  <PLOPT_DisableTileHighlighting>Disable Tile Highlighting</PLOPT_DisableTileHighlighting>
+  <PLOPT_DisableTileHighlightingToolTip>Disable tile highlighting altogether.</PLOPT_DisableTileHighlightingToolTip>
+  <PLOPT_DisableTileBlinking>Disable Tile Blinking</PLOPT_DisableTileBlinking>
+  <PLOPT_DisableTileBlinkingToolTip>Disable tile blinking ("breathing") for filtered tiles on the world map.</PLOPT_DisableTileBlinkingToolTip>
+  <PLOPT_ShowDebugTileId>Show Debug Tile ID</PLOPT_ShowDebugTileId>
+  <PLOPT_ShowDebugTileIdToolTip>Show the Debug Tile ID for the highlighted tiles.</PLOPT_ShowDebugTileIdToolTip>
+  <PLOPT_BypassTileHighlighterMaximumToolTip>Allow highlighting more than {0} tiles.</PLOPT_BypassTileHighlighterMaximumToolTip>
+  <PLOPT_BypassTileHighlighterMaximum>Bypass Tile Highlighter Maximum</PLOPT_BypassTileHighlighterMaximum>
+</LanguageData>
