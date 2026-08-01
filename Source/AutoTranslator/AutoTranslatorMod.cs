@@ -164,5 +164,10 @@ public class AutoTranslatorMod : Mod
                 settings.DisablePlatform(kv.Key);
             }
         }
+
+        // 设置内容在窗口打开期间被持续编辑（开关、平台勾选、凭据输入），
+        // 必须主动写回磁盘，否则仅存在于内存、关闭窗口/退出游戏后丢失。
+        // WriteSettings 会序列化 ExposeData 中的字段到 {ModId}.xml。
+        settings.WriteSettings();
     }
 }

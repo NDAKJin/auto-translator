@@ -9,7 +9,7 @@ namespace nomadicooer.AutoTranslator;
 /// 翻译平台凭据：一个平台对应一条记录（AccessKey / SecretKey）。
 /// 列表形式存储，支持在设置页动态增删启用的平台。
 /// </summary>
-public class PlatformCredential
+public class PlatformCredential : IExposable
 {
     /// <summary>平台标识：Volcengine / Aliyun / Baidu。</summary>
     public string PlatformId;
