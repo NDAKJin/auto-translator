@@ -357,10 +357,17 @@ public static class AutoTranslatorEngine
                 TranslationResult result = dispatcher.Translate(source, target, fallback);
                 if (result.Success && !string.IsNullOrEmpty(result.TranslatedText))
                 {
-                    ok = true;
-                    translated = result.TranslatedText;
-                    Cache[key] = translated;
-                    WriteToRimWorld(key, translated);
+                    // 译文落盘/回写前做占位符规范化与校验：
+                    // 机翻常把 {0} 翻成全角 ｛0｝（游戏不会解析，原样显示），或漏/多占位符导致运行时格式化异常。
+                    // 不通过则丢弃译文，按失败处理（写原文，不污染 auto.xml，下次仍可重翻）。
+                    string sanitized = SanitizeTranslation(fallback, result.TranslatedText);
+                    if (sanitized != null)
+                    {
+                        ok = true;
+                        translated = sanitized;
+                        Cache[key] = translated;
+                        WriteToRimWorld(key, translated);
+                    }
                 }
             }
             finally
@@ -394,6 +401,64 @@ public static class AutoTranslatorEngine
             byte ignored;
             Pending.TryRemove(key, out ignored);
         }
+    }
+
+    /// <summary>
+    /// 译文落盘/回写前的占位符规范化与校验。
+    /// 翻译 API（尤其机翻）常把 RimWorld 的半角占位符 {0}/{1} 翻成全角 ｛0｝（游戏不解析，原样显示），
+    /// 或漏翻/多翻占位符导致运行期 string.Format 抛异常。
+    /// 处理：1) 全角花括号 ｛｝ 还原为半角 {}；2) 提取译文与原文的 {N} 数字集合比对，不一致视为损坏。
+    /// 返回规范化后的译文；损坏（占位符集合不匹配）返回 null，调用方应丢弃译文按失败处理。
+    /// </summary>
+    private static string SanitizeTranslation(string source, string translated)
+    {
+        if (string.IsNullOrEmpty(translated))
+        {
+            return null;
+        }
+
+        // 1) 全角花括号还原为半角（机翻最常见的占位符损坏形式）。
+        string normalized = translated.Replace('｛', '{').Replace('｝', '}');
+
+        // 2) 提取原文与译文的 {N} 占位符数字集合并比对。
+        HashSet<int> sourceArgs = ExtractPlaceholderIndices(source);
+        HashSet<int> translatedArgs = ExtractPlaceholderIndices(normalized);
+        if (!sourceArgs.SetEquals(translatedArgs))
+        {
+            Logger.Warning(string.Format(
+                "译文占位符不匹配，已丢弃（原文 {0} 个 / 译文 {1} 个）：{2}",
+                sourceArgs.Count, translatedArgs.Count, source));
+            return null;
+        }
+
+        return normalized == translated ? translated : normalized;
+    }
+
+    /// <summary>
+    /// 提取字符串中 {N} 形式的占位符数字（N 为非负整数）。RimWorld 文本格式化使用 {0}/{1}/...。
+    /// 用正则匹配避免误伤普通花括号文本。
+    /// </summary>
+    private static HashSet<int> ExtractPlaceholderIndices(string text)
+    {
+        var set = new HashSet<int>();
+        if (string.IsNullOrEmpty(text))
+        {
+            return set;
+        }
+
+        // 匹配 { 数字 }（允许数字前后有空白，兼容 {0} 与 { 0 } 写法）。
+        System.Text.RegularExpressions.MatchCollection matches =
+            System.Text.RegularExpressions.Regex.Matches(text, @"\{\s*(\d+)\s*\}");
+        foreach (System.Text.RegularExpressions.Match m in matches)
+        {
+            int idx;
+            if (int.TryParse(m.Groups[1].Value, out idx))
+            {
+                set.Add(idx);
+            }
+        }
+
+        return set;
     }
 
     /// <summary>
