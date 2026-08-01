@@ -65,42 +65,112 @@ public class BaiduTranslate : TranslatePlatform
     /// 凭证通过构造函数注入；未配置或请求失败时记录日志并返回原文。
     /// 注意：当前为同步实现（会阻塞调用线程）。
     /// </summary>
-    public override string Translate(string source, string target, string text)
+    public override TranslationResult Translate(string source, string target, string text)
     {
         if (string.IsNullOrEmpty(_appId) || string.IsNullOrEmpty(_secretKey))
         {
             Debug.WriteLine("[AutoTranslator] 百度翻译凭证未配置，返回原文。");
-            return text;
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "百度翻译凭证未配置");
+        }
+
+        if (string.IsNullOrEmpty(text))
+        {
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "待翻译文本为空");
         }
 
         string from = GetLangCode(source);
+        if (string.IsNullOrEmpty(from))
+        {
+            Debug.WriteLine("[AutoTranslator] 百度翻译不支持源语言: " + source);
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "百度翻译不支持源语言: " + source);
+        }
+
         string to = GetLangCode(target);
-        if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to) || string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(to))
         {
-            return text;
+            Debug.WriteLine("[AutoTranslator] 百度翻译不支持目标语言: " + target);
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "百度翻译不支持目标语言: " + target);
         }
 
-        try
+        // 请求逻辑包进节流器：自动控制 QPS，撞到限流码时指数退避重试
+        return ExecuteWithThrottle(() =>
         {
-            string salt = _random.Next(100000).ToString(CultureInfo.InvariantCulture);
-            string sign = Md5Hex(_appId + text + salt + _secretKey);
+            try
+            {
+                string salt = _random.Next(100000).ToString(CultureInfo.InvariantCulture);
+                string sign = Md5Hex(_appId + text + salt + _secretKey);
 
-            string url = Endpoint
-                         + "?q=" + Uri.EscapeDataString(text)
-                         + "&from=" + from
-                         + "&to=" + to
-                         + "&appid=" + Uri.EscapeDataString(_appId)
-                         + "&salt=" + salt
-                         + "&sign=" + sign;
+                string url = Endpoint
+                             + "?q=" + Uri.EscapeDataString(text)
+                             + "&from=" + from
+                             + "&to=" + to
+                             + "&appid=" + Uri.EscapeDataString(_appId)
+                             + "&salt=" + salt
+                             + "&sign=" + sign;
 
-            string response = HttpGet(url);
-            string translated = ExtractTranslation(response);
-            return string.IsNullOrEmpty(translated) ? text : translated;
-        }
-        catch (Exception ex)
+                string response = HttpGet(url);
+
+                // 先检查业务错误码：成功时无 error_code 字段或为 52000，其余均为失败
+                string platformCode = ExtractField(response, "error_code");
+                if (!string.IsNullOrEmpty(platformCode) && platformCode != "52000")
+                {
+                    TranslationErrorCode code = MapBaiduErrorCode(platformCode);
+                    string err = "百度翻译错误 " + platformCode + ": " + DescribeError(platformCode);
+                    Debug.WriteLine("[AutoTranslator] " + err
+                                    + "，原始信息: " + ExtractField(response, "error_msg"));
+                    return TranslationResult.Fail(text, code, err);
+                }
+
+                string translated = ExtractTranslation(response);
+                if (string.IsNullOrEmpty(translated))
+                {
+                    Debug.WriteLine("[AutoTranslator] 百度翻译响应中未找到译文");
+                    return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "百度翻译响应中未找到译文");
+                }
+
+                return TranslationResult.Ok(translated);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[AutoTranslator] 百度翻译请求失败: " + ex.Message);
+                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "百度翻译请求失败: " + ex.Message);
+            }
+        });
+    }
+
+    /// <summary>
+    /// 百度标准版限制 1 QPS，故两次请求最少间隔 1 秒。
+    /// 高级版/尊享版 QPS 更高，可下调此值以提升批量翻译速度。
+    /// </summary>
+    protected override int MinIntervalMs => 1000;
+
+    /// <summary>
+    /// 判定是否为可重试的限流/临时错误（统一错误码层：ErrorCode == RateLimited）。
+    /// 由 <see cref="MapBaiduErrorCode"/> 已把平台码映射为统一码。
+    /// </summary>
+    protected override bool IsRateLimitError(TranslationErrorCode errorCode)
+    {
+        return errorCode == TranslationErrorCode.RateLimited;
+    }
+
+    /// <summary>
+    /// 将百度平台业务错误码映射为统一错误码（<see cref="TranslationErrorCode"/>）。
+    /// 限流/超时/系统繁忙等瞬时故障 → RateLimited(1)；其余参数/语种/权限/余额类 → InvalidRequest(3)。
+    /// </summary>
+    private static TranslationErrorCode MapBaiduErrorCode(string code)
+    {
+        switch (code)
         {
-            Debug.WriteLine("[AutoTranslator] 百度翻译请求失败: " + ex.Message);
-            return text;
+            // 可重试的临时故障
+            case "54003": // 访问频率受限
+            case "59004": // QPS 超限
+            case "54005": // 长 query 请求频繁
+            case "52001": // 请求超时
+            case "52002": // 系统错误
+            case "52003": // 未授权（服务端临时）→ 归为临时故障，重试可能恢复
+                return TranslationErrorCode.RateLimited;
+            default:
+                return TranslationErrorCode.InvalidRequest;
         }
     }
 
@@ -136,6 +206,73 @@ public class BaiduTranslate : TranslatePlatform
 
         return UnescapeJson(m.Groups[1].Value);
     }
+
+    /// <summary>
+    /// 从响应 JSON 中提取指定顶层字段的值（支持数字与字符串两种字面量）。
+    /// 用于读取 error_code / error_msg 等错误信息字段，找不到时返回 null。
+    /// </summary>
+    private static string ExtractField(string response, string fieldName)
+    {
+        if (string.IsNullOrEmpty(response) || string.IsNullOrEmpty(fieldName))
+        {
+            return null;
+        }
+
+        // 字符串形式："error_code":"54001"
+        Match str = Regex.Match(response, "\"" + Regex.Escape(fieldName) + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+        if (str.Success)
+        {
+            return UnescapeJson(str.Groups[1].Value);
+        }
+
+        // 数字形式："error_code":54001
+        Match num = Regex.Match(response, "\"" + Regex.Escape(fieldName) + "\"\\s*:\\s*(-?\\d+)");
+        return num.Success ? num.Groups[1].Value : null;
+    }
+
+    /// <summary>
+    /// 将百度翻译错误码翻译为可读中文描述（含解决方案提示）。
+    /// 未收录的错误码原样返回，便于排查。
+    /// </summary>
+    private static string DescribeError(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+        {
+            return string.Empty;
+        }
+
+        return ErrorMessages.TryGetValue(code, out string message) ? message : "未收录的错误码";
+    }
+
+    /// <summary>
+    /// 百度翻译错误码 -> 中文描述（含处理建议）。
+    /// 依据百度翻译开放平台官方错误码表；52000 为成功，不在失败分支使用。
+    /// </summary>
+    private static readonly Dictionary<string, string> ErrorMessages = new Dictionary<string, string>
+    {
+        { "52000", "成功" },
+        { "52001", "请求超时，请检查原文及语种是否受支持" },
+        { "52002", "系统错误，请重试" },
+        { "52003", "未授权用户，请检查 appid 是否正确或服务是否已开通" },
+        { "54000", "必填参数为空，请检查是否漏传或误传参数" },
+        { "54001", "签名错误或 token 错误，请检查签名生成方法" },
+        { "54003", "访问频率受限，请降低调用频率或升级为高级版/尊享版" },
+        { "54004", "账户余额不足，请前往管理控制台充值" },
+        { "54005", "长 query 请求频繁，请降低超 1 万字节请求的频率，3 秒后再试" },
+        { "58000", "客户端 IP 非法，请检查开发者信息页填写的服务器 IP" },
+        { "58001", "译文语言方向不支持，标准版/高级版仅支持 28 个常见语种" },
+        { "58002", "服务当前已关闭，请前往管理控制台开启服务" },
+        { "58003", "此 IP 已被封禁（同一 IP 当日使用多个 APPID），次日解封" },
+        { "58004", "模型参数错误，model_type 须为 llm 或 nmt" },
+        { "59002", "翻译指令过长，reference 参数超过 500 字符上限" },
+        { "59003", "请求文本过长，q 参数超过 6000 字符上限" },
+        { "59004", "QPS 超限，当前接口 QPS 已触及上限" },
+        { "59005", "tag_handling 参数非法，须为 0 或 1" },
+        { "59006", "标签解析失败，标签未闭合或为空" },
+        { "59007", "ignore_tags 长度超限，上限为 20" },
+        { "90107", "认证未通过或未生效，请前往「我的认证」查看进度" },
+        { "20003", "请求内容存在安全风险，请检查文本是否涉及违规内容" },
+    };
 
     /// <summary>
     /// 计算 MD5 小写 32 位十六进制。

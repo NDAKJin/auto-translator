@@ -73,31 +73,104 @@ public class AliyunTranslate : TranslatePlatform
     /// 凭证通过构造函数注入；未配置或请求失败时记录日志并返回原文。
     /// 注意：当前为同步实现（会阻塞调用线程）。
     /// </summary>
-    public override string Translate(string source, string target, string text)
+    public override TranslationResult Translate(string source, string target, string text)
     {
         if (string.IsNullOrEmpty(_accessKeyId) || string.IsNullOrEmpty(_accessKeySecret))
         {
             Debug.WriteLine("[AutoTranslator] 阿里云翻译凭证未配置，返回原文。");
-            return text;
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "阿里云翻译凭证未配置");
+        }
+
+        if (string.IsNullOrEmpty(text))
+        {
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "待翻译文本为空");
         }
 
         string from = GetLangCode(source);
-        string to = GetLangCode(target);
-        if (string.IsNullOrEmpty(from) || string.IsNullOrEmpty(to) || string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(from))
         {
-            return text;
+            Debug.WriteLine("[AutoTranslator] 阿里云翻译不支持源语言: " + source);
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "阿里云翻译不支持源语言: " + source);
         }
 
-        try
+        string to = GetLangCode(target);
+        if (string.IsNullOrEmpty(to))
         {
-            string response = SendRequest(from, to, text);
-            string translated = ExtractTranslation(response);
-            return string.IsNullOrEmpty(translated) ? text : translated;
+            Debug.WriteLine("[AutoTranslator] 阿里云翻译不支持目标语言: " + target);
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "阿里云翻译不支持目标语言: " + target);
         }
-        catch (Exception ex)
+
+        // 请求逻辑包进节流器：自动控制 QPS，撞到限流码时指数退避重试
+        return ExecuteWithThrottle(() =>
         {
-            Debug.WriteLine("[AutoTranslator] 阿里云翻译请求失败: " + ex.Message);
-            return text;
+            try
+            {
+                string response = SendRequest(from, to, text);
+
+                // 先检查业务错误码：非 200 说明翻译失败，记录可读描述后返回原文
+                string platformCode = ExtractField(response, "Code");
+                if (!string.IsNullOrEmpty(platformCode) && platformCode != "200")
+                {
+                    TranslationErrorCode code = MapAliyunErrorCode(platformCode);
+                    string err = "阿里云翻译错误 " + platformCode + ": " + DescribeError(platformCode);
+                    Debug.WriteLine("[AutoTranslator] " + err
+                                    + "，原始信息: " + ExtractField(response, "Message"));
+                    return TranslationResult.Fail(text, code, err);
+                }
+
+                string translated = ExtractTranslation(response);
+                if (string.IsNullOrEmpty(translated))
+                {
+                    Debug.WriteLine("[AutoTranslator] 阿里云翻译响应中未找到译文");
+                    return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "阿里云翻译响应中未找到译文");
+                }
+
+                return TranslationResult.Ok(translated);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[AutoTranslator] 阿里云翻译请求失败: " + ex.Message);
+                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "阿里云翻译请求失败: " + ex.Message);
+            }
+        });
+    }
+
+    /// <summary>
+    /// 阿里云机器翻译通用版默认 50 QPS，此处保守设为 100ms 间隔（约 10 QPS），
+    /// 避免突发请求触发限流。
+    /// </summary>
+    protected override int MinIntervalMs => 100;
+
+    /// <summary>
+    /// 判定是否为可重试的限流/临时错误（统一错误码层：ErrorCode == RateLimited）。
+    /// 由 <see cref="MapAliyunErrorCode"/> 已把平台码映射为统一码。
+    /// </summary>
+    protected override bool IsRateLimitError(TranslationErrorCode errorCode)
+    {
+        return errorCode == TranslationErrorCode.RateLimited;
+    }
+
+    /// <summary>
+    /// 将阿里云平台业务错误码映射为统一错误码（<see cref="TranslationErrorCode"/>）。
+    /// 限流/超时/系统繁忙等瞬时故障 → RateLimited；其余参数/语种/权限类 → InvalidRequest。
+    /// </summary>
+    private static TranslationErrorCode MapAliyunErrorCode(string code)
+    {
+        if (code == "Throttling" || code == "Throttling.User" || code == "Throttling.Api")
+        {
+            return TranslationErrorCode.RateLimited;
+        }
+
+        switch (code)
+        {
+            // 可重试的临时故障（原判定为限流的码）
+            case "10001": // 请求超时
+            case "10002": // 系统错误
+            case "10007": // 翻译失败
+            case "10012": // 翻译服务调用失败
+                return TranslationErrorCode.RateLimited;
+            default:
+                return TranslationErrorCode.InvalidRequest;
         }
     }
 
@@ -196,6 +269,65 @@ public class AliyunTranslate : TranslatePlatform
         Match m = Regex.Match(response, "\"Translated\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
         return m.Success ? UnescapeJson(m.Groups[1].Value) : null;
     }
+
+    /// <summary>
+    /// 从响应 JSON 中提取指定顶层字段的值（支持数字与字符串两种字面量）。
+    /// 用于读取 Code / Message 等错误信息字段，找不到时返回 null。
+    /// </summary>
+    private static string ExtractField(string response, string fieldName)
+    {
+        if (string.IsNullOrEmpty(response) || string.IsNullOrEmpty(fieldName))
+        {
+            return null;
+        }
+
+        // 字符串形式："Code":"10005"
+        Match str = Regex.Match(response, "\"" + Regex.Escape(fieldName) + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+        if (str.Success)
+        {
+            return UnescapeJson(str.Groups[1].Value);
+        }
+
+        // 数字形式："Code":10005
+        Match num = Regex.Match(response, "\"" + Regex.Escape(fieldName) + "\"\\s*:\\s*(-?\\d+)");
+        return num.Success ? num.Groups[1].Value : null;
+    }
+
+    /// <summary>
+    /// 将阿里云机器翻译错误码翻译为可读中文描述。
+    /// 未收录的错误码原样返回，便于排查。
+    /// </summary>
+    private static string DescribeError(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+        {
+            return string.Empty;
+        }
+
+        return ErrorMessages.TryGetValue(code, out string message) ? message : "未收录的错误码";
+    }
+
+    /// <summary>
+    /// 阿里云机器翻译错误码 -> 中文描述。
+    /// 依据官方错误码表（HttpCode 101~113 / 199 对应错误码 10001~10013 / 19999）。
+    /// </summary>
+    private static readonly Dictionary<string, string> ErrorMessages = new Dictionary<string, string>
+    {
+        { "10001", "请求超时" },
+        { "10002", "系统错误" },
+        { "10003", "原文解码失败，请检查原文是否 UrlEncode" },
+        { "10004", "参数缺失" },
+        { "10005", "语项不支持" },
+        { "10006", "语种识别失败" },
+        { "10007", "翻译失败" },
+        { "10008", "字符长度过长" },
+        { "10009", "子账号没有权限" },
+        { "10010", "账号没有开通服务" },
+        { "10011", "子账号服务失败" },
+        { "10012", "翻译服务调用失败" },
+        { "10013", "账号服务没有开通或者欠费" },
+        { "19999", "未知异常" },
+    };
 
     /// <summary>
     /// 阿里云要求的 RFC3986 percent-encoding：
@@ -304,44 +436,42 @@ public class AliyunTranslate : TranslatePlatform
 
     /// <summary>
     /// RimWorld 语言文件夹的英文名 -> 阿里云翻译语言码。
-    /// 覆盖 Core/Languages 目录下主流官方语言；繁中阿里云用 zh-tw。
+    /// 依据阿里云官方语种列表核对，仅收录 RimWorld Core/Languages 下的官方语言，
+    /// 阿里云支持 200+ 语种但 RimWorld 用不到的不在此列出（避免无效条目）。
+    /// 繁体中文用 zh-tw（对应官方列表「中文繁体 Traditional Chinese」）。
+    /// 注意：Ukrainian（乌克兰语）不在阿里云官方语种列表中，故不映射，返回 null 由上层跳过。
     /// 未列出的返回 null。
     /// </summary>
     private static readonly Dictionary<string, string> RimWorldToAliyun = new Dictionary<string, string>
     {
-        { "English", "en" },
-        { "ChineseSimplified", "zh" },
-        { "ChineseTraditional", "zh-tw" },
-        { "Catalan", "ca" },
-        { "Czech", "cs" },
-        { "Danish", "da" },
-        { "Dutch", "nl" },
-        { "Estonian", "et" },
-        { "Finnish", "fi" },
-        { "French", "fr" },
-        { "German", "de" },
-        { "Greek", "el" },
-        { "Hungarian", "hu" },
-        { "Italian", "it" },
-        { "Japanese", "ja" },
-        { "Korean", "ko" },
-        { "Norwegian", "no" },
-        { "Polish", "pl" },
-        { "Portuguese", "pt" },
-        { "PortugueseBrazilian", "pt" },
-        { "Romanian", "ro" },
-        { "Russian", "ru" },
-        { "Slovak", "sk" },
-        { "Spanish", "es" },
-        { "SpanishLatin", "es" },
-        { "Swedish", "sv" },
-        { "Turkish", "tr" },
-        { "Ukrainian", "uk" },
-        { "Vietnamese", "vi" },
-        { "Thai", "th" },
-        { "Arabic", "ar" },
-        { "Indonesian", "id" },
-        { "Malay", "ms" },
-        { "Hindi", "hi" },
+        { "English", "en" },                 // English
+        { "ChineseSimplified", "zh" },       // ChineseSimplified (简体中文)
+        { "ChineseTraditional", "zh-tw" },   // ChineseTraditional (繁體中文)
+        { "Catalan", "ca" },                 // Catalan (Català)
+        { "Czech", "cs" },                   // Czech (Čeština)
+        { "Danish", "da" },                  // Danish (Dansk)
+        { "Dutch", "nl" },                   // Dutch (Nederlands)
+        { "Estonian", "et" },                // Estonian (Eesti)
+        { "Finnish", "fi" },                 // Finnish (Suomi)
+        { "French", "fr" },                  // French (Français)
+        { "German", "de" },                  // German (Deutsch)
+        { "Greek", "el" },                   // Greek (Ελληνικά)
+        { "Hungarian", "hu" },               // Hungarian (Magyar)
+        { "Italian", "it" },                 // Italian (Italiano)
+        { "Japanese", "ja" },                // Japanese (日本語)
+        { "Korean", "ko" },                  // Korean (한국어)
+        { "Norwegian", "no" },               // Norwegian (Norsk Bokmål)
+        { "Polish", "pl" },                  // Polish (Polski)
+        { "Portuguese", "pt" },              // Portuguese (Português)
+        { "PortugueseBrazilian", "pt" },     // PortugueseBrazilian，阿里云无巴葡独立码，回退 pt
+        { "Romanian", "ro" },                // Romanian (Română)
+        { "Russian", "ru" },                 // Russian (Русский)
+        { "Slovak", "sk" },                  // Slovak (Slovenčina)
+        { "Spanish", "es" },                 // Spanish (Español(Castellano))
+        { "SpanishLatin", "es" },            // SpanishLatin，阿里云无拉美西语独立码，回退 es
+        { "Swedish", "sv" },                 // Swedish (Svenska)
+        { "Turkish", "tr" },                 // Turkish (Türkçe)
+        { "Vietnamese", "vi" },              // Vietnamese (tiếng Việt)
+        // Ukrainian (Українська)：阿里云官方语种列表中无乌克兰语，不支持，故不映射
     };
 }

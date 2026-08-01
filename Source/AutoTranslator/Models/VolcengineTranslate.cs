@@ -108,35 +108,160 @@ public class VolcengineTranslate : TranslatePlatform
     /// 凭证通过构造函数注入；未配置或请求失败时记录日志并返回原文。
     /// 注意：当前为同步实现（会阻塞调用线程），联调/正式版应改为异步。
     /// </summary>
-    public override string Translate(string source, string target, string text)
+    public override TranslationResult Translate(string source, string target, string text)
     {
         if (string.IsNullOrEmpty(_accessKey) || string.IsNullOrEmpty(_secretKey))
         {
             Debug.WriteLine("[AutoTranslator] 火山翻译凭证未配置，返回原文。");
-            return text;
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "火山翻译凭证未配置");
         }
 
         // 火山翻译不支持 auto 自动检测，source 必须为目标语言之外的具体语言码
-        if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(target) || string.IsNullOrEmpty(text))
+        if (string.IsNullOrEmpty(text))
         {
-            return text;
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "待翻译文本为空");
+        }
+
+        if (string.IsNullOrEmpty(source))
+        {
+            Debug.WriteLine("[AutoTranslator] 火山翻译不支持源语言: " + source);
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "火山翻译不支持源语言: " + source);
+        }
+
+        if (string.IsNullOrEmpty(target))
+        {
+            Debug.WriteLine("[AutoTranslator] 火山翻译不支持目标语言: " + target);
+            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "火山翻译不支持目标语言: " + target);
         }
 
         string payload = "{\"SourceLanguage\":\"" + JsonEscape(source)
                          + "\",\"TargetLanguage\":\"" + JsonEscape(target)
                          + "\",\"TextList\":[\"" + JsonEscape(text) + "\"]}";
 
-        try
+        // 请求逻辑包进节流器：自动控制 QPS，撞到限流码时指数退避重试
+        return ExecuteWithThrottle(() =>
         {
-            string response = SendRequest(payload, _accessKey, _secretKey);
-            string translated = ExtractTranslation(response);
-            return string.IsNullOrEmpty(translated) ? text : translated;
-        }
-        catch (Exception ex)
+            try
+            {
+                string response = SendRequest(payload, _accessKey, _secretKey);
+
+                // 火山错误信息位于 ResponseMetadata.Error.Code（数值码，如 -429；或字符串码如 Throttling）
+                string platformCode = ExtractField(response, "Code");
+                if (!string.IsNullOrEmpty(platformCode) && platformCode != "0" && platformCode != "200")
+                {
+                    TranslationErrorCode code = MapVolcErrorCode(platformCode);
+                    string err = "火山翻译错误 " + platformCode + ": " + DescribeError(platformCode)
+                                  + "（" + ExtractField(response, "Message") + "）";
+                    Debug.WriteLine("[AutoTranslator] " + err);
+                    return TranslationResult.Fail(text, code, err);
+                }
+
+                string translated = ExtractTranslation(response);
+                if (string.IsNullOrEmpty(translated))
+                {
+                    Debug.WriteLine("[AutoTranslator] 火山翻译响应中未找到译文");
+                    return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译响应中未找到译文");
+                }
+
+                return TranslationResult.Ok(translated);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[AutoTranslator] 火山翻译请求失败: " + ex.Message);
+                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译请求失败: " + ex.Message);
+            }
+        });
+    }
+
+    /// <summary>
+    /// 火山文本翻译默认限额较宽松，此处保守设为 100ms 间隔（约 10 QPS）。
+    /// </summary>
+    protected override int MinIntervalMs => 100;
+
+    /// <summary>
+    /// 判定是否为可重试的限流/临时错误（统一错误码层：ErrorCode == RateLimited）。
+    /// 由 <see cref="MapVolcErrorCode"/> 已把平台码映射为统一码。
+    /// </summary>
+    protected override bool IsRateLimitError(TranslationErrorCode errorCode)
+    {
+        return errorCode == TranslationErrorCode.RateLimited;
+    }
+
+    /// <summary>
+    /// 将火山平台业务错误码映射为统一错误码（<see cref="TranslationErrorCode"/>）。
+    /// 限流/超时/系统繁忙等瞬时故障 → RateLimited；其余参数/语种类 → InvalidRequest。
+    /// </summary>
+    private static TranslationErrorCode MapVolcErrorCode(string code)
+    {
+        switch (code)
         {
-            Debug.WriteLine("[AutoTranslator] 火山翻译请求失败: " + ex.Message);
-            return text;
+            // 可重试的临时故障
+            case "-429": // 请求过于频繁
+            case "-500": // 服务内部错误（官方建议重试）
+                return TranslationErrorCode.RateLimited;
+            default:
+                if (!string.IsNullOrEmpty(code)
+                    && (code.StartsWith("Throttling", StringComparison.OrdinalIgnoreCase)
+                        || code.IndexOf("QpsLimit", StringComparison.OrdinalIgnoreCase) >= 0
+                        || code.IndexOf("TooManyRequests", StringComparison.OrdinalIgnoreCase) >= 0
+                        || code == "InternalServerError"))
+                {
+                    return TranslationErrorCode.RateLimited;
+                }
+
+                return TranslationErrorCode.InvalidRequest;
         }
+    }
+
+    /// <summary>
+    /// 将火山翻译错误码翻译为可读中文描述（含解决方案提示）。
+    /// 未收录的错误码原样返回，便于排查。
+    /// </summary>
+    private static string DescribeError(string code)
+    {
+        if (string.IsNullOrEmpty(code))
+        {
+            return string.Empty;
+        }
+
+        return ErrorMessages.TryGetValue(code, out string message) ? message : "未收录的错误码";
+    }
+
+    /// <summary>
+    /// 火山翻译错误码 -> 中文描述（含处理建议）。
+    /// 依据火山引擎机器翻译（translate 2025-03-01）官方错误码表；
+    /// 成功码为 0 / 200，不在失败分支使用。1000XX 为接口具体业务错误，详见 Message。
+    /// </summary>
+    private static readonly Dictionary<string, string> ErrorMessages = new Dictionary<string, string>
+    {
+        { "-400", "请求参数错误，请检查请求参数是否正确（具体错误见 Message）" },
+        { "-415", "不支持的翻译，请检查语言支持里是否支持该语向" },
+        { "-429", "请求过于频繁，请降低请求频率或稍后重试" },
+        { "-500", "翻译服务内部错误，请重试；若多次失败请联系客服" },
+        { "1000XX", "接口业务错误，详见 Message 信息" },
+    };
+
+    /// <summary>
+    /// 从响应 JSON 中提取指定字段的值（支持数字与字符串两种字面量）。
+    /// 用于读取 Code / Message 等错误信息字段，找不到时返回 null。
+    /// </summary>
+    private static string ExtractField(string response, string fieldName)
+    {
+        if (string.IsNullOrEmpty(response) || string.IsNullOrEmpty(fieldName))
+        {
+            return null;
+        }
+
+        // 字符串形式："Code":"Throttling"
+        Match str = Regex.Match(response, "\"" + Regex.Escape(fieldName) + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
+        if (str.Success)
+        {
+            return UnescapeJson(str.Groups[1].Value);
+        }
+
+        // 数字形式："Code":100
+        Match num = Regex.Match(response, "\"" + Regex.Escape(fieldName) + "\"\\s*:\\s*(-?\\d+)");
+        return num.Success ? num.Groups[1].Value : null;
     }
 
     private static string SendRequest(string payload, string accessKey, string secretKey)
