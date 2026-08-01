@@ -19,4 +19,5 @@
   <AutoTranslator.CredentialTable>Credentials</AutoTranslator.CredentialTable>
   <AutoTranslator.AccessKey>Access key</AutoTranslator.AccessKey>
   <AutoTranslator.SecretKey>Secret key</AutoTranslator.SecretKey>
+  <AutoTranslator.ResetDefaults>Reset to defaults</AutoTranslator.ResetDefaults>
 </LanguageData>

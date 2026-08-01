@@ -155,4 +155,17 @@ public class AutoTranslatorSettings : ModSettings
     {
         Credentials.RemoveAll(c => c.PlatformId == platformId);
     }
+
+    /// <summary>设置页"恢复默认设置"按钮的翻译键名。</summary>
+    public const string ResetDefaultsKey = AutoTranslatorConstants.TranslationKeyPrefix + "ResetDefaults";
+
+    /// <summary>
+    /// 恢复首次安装时的默认设置：清空凭据列表，两个开关回到默认（开）。
+    /// </summary>
+    public void ResetToDefaults()
+    {
+        Credentials.Clear();
+        EnableKeyRecording = true;
+        EnableRealtimeUpdate = true;
+    }
 }

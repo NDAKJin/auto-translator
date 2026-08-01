@@ -44,10 +44,26 @@ public class AutoTranslatorMod : Mod
         return AutoTranslatorSettings.SettingsCategoryKey.Translate();
     }
 
+    /// <summary>设置页滚动视图的纵向位移状态（跨帧保留）。</summary>
+    private UnityEngine.Vector2 settingsScrollPos;
+
     public override void DoSettingsWindowContents(UnityEngine.Rect inRect)
     {
+        // 设置页内容较多，使用滚动视图以适配较小的设置窗口。
+        const float ScrollBarMargin = 16f;
+        UnityEngine.Rect outRect = inRect;
+        // 内部视图高度预留足够空间，确保窗口高度受限时仍可滚动到底。
+        const float ViewHeight = 720f;
+        UnityEngine.Rect viewRect = new UnityEngine.Rect(
+            0f,
+            0f,
+            inRect.width - ScrollBarMargin,
+            ViewHeight);
+
+        Widgets.BeginScrollView(outRect, ref settingsScrollPos, viewRect);
+
         var listing = new Listing_Standard();
-        listing.Begin(inRect);
+        listing.Begin(viewRect);
 
         // 当前激活语言（只读显示）
         listing.Label(
@@ -104,6 +120,14 @@ public class AutoTranslatorMod : Mod
             cred.SecretKey = listing.TextEntry(cred.SecretKey);
         }
 
+        // 重置默认按钮：清空所有凭据与开关，恢复到首次安装时的初始状态。
+        listing.Gap(12f);
+        if (listing.ButtonText(AutoTranslatorSettings.ResetDefaultsKey.Translate()))
+        {
+            settings.ResetToDefaults();
+        }
+
         listing.End();
+        Widgets.EndScrollView();
     }
 }

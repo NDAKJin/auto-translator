@@ -19,4 +19,5 @@
   <AutoTranslator.CredentialTable>凭据</AutoTranslator.CredentialTable>
   <AutoTranslator.AccessKey>访问键</AutoTranslator.AccessKey>
   <AutoTranslator.SecretKey>密钥</AutoTranslator.SecretKey>
+  <AutoTranslator.ResetDefaults>恢复默认设置</AutoTranslator.ResetDefaults>
 </LanguageData>
