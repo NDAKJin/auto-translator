@@ -45,7 +45,7 @@ public static class TranslationPatch
         }
         else
         {
-            AutoXmlWriter.WriteAutoKey(key, fallback, overwrite: false);
+            AutoXmlWriter.WriteAutoKey(key, fallback, translated: false, overwrite: false);
         }
     }
 }

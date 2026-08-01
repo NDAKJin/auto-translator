@@ -8,16 +8,39 @@ namespace nomadicooer.AutoTranslator;
 
 /// <summary>
 /// 未翻译 key 的文件读写工具，写到本模组自身语言包目录的 Keyed/ 下，单文件 auto.xml。
-/// auto.xml 的 value 含义随模式不同：
-///   - 实时翻译开启：value 为译文（翻译成功后写入）。
-///   - 实时翻译关闭：value 为默认语言（英文）原文内容（仅记录待翻译 key 与原文）。
-/// 引擎据此判断是否需要翻译：value 与默认语言内容相同即为"未翻译"，需调 API。
+/// 每条记录带显式 <c>translated</c> 属性，避免依赖"value 是否等于原文"这种脆弱推断：
+///   - translated="false"：待翻译，value 为默认语言（英文）原文内容（记录阶段）。
+///   - translated="true" ：已翻译，value 为译文（翻译成功后写入）。
+/// "一键翻译"只挑 translated="false" 的条目提交，翻译成功改写成 true，
+/// 彻底杜绝"引擎返回原文导致永远判定未翻译、反复调 API"的死循环。
 /// 作为独立底层工具供 AutoTranslatorEngine（后台线程）单向依赖，
 /// 避免 TranslationPatch 与 AutoTranslatorEngine 互相引用。
 /// 默认语言 English（激活语言即默认语言）不写文件：英文地区无需翻译。
 /// </summary>
 public static class AutoXmlWriter
 {
+    /// <summary>
+    /// auto.xml 中单条记录的结构化表示。
+    /// </summary>
+    public sealed class AutoKeyEntry
+    {
+        /// <summary>翻译 key（同时是 xml 元素名）。</summary>
+        public string Key;
+
+        /// <summary>value：待翻译时为默认语言原文，已翻译时为译文。</summary>
+        public string Value;
+
+        /// <summary>是否已翻译完成。false=待翻译，true=已翻译。</summary>
+        public bool Translated;
+    }
+
+    /// <summary>
+    /// xml 属性名：标记该条记录是否已翻译。
+    /// 注意：RimWorld 的 LanguageData 加载器会忽略未知属性（仅读取元素文本为 key 的 value），
+    /// 因此该属性不会污染语言包加载，仅作为本模组的私有元数据。
+    /// </summary>
+    private const string TranslatedAttr = "translated";
+
     // 本模组自身语言包目录：.../AutoTranslator/Languages/<语言folderName>/Keyed/
     // 优先从运行中的本模组（packageId == ModId）取 RootDir（最准确），兜底用启动期记录值。
     private static string ModRootDir
@@ -56,11 +79,12 @@ public static class AutoXmlWriter
 
     /// <summary>
     /// 将 key 写入 auto.xml。
-    /// overwrite=true 时（翻译成功写译文）覆盖已有记录；
+    /// translated 标记该条记录是否已翻译：记录原文阶段传 false，写译文阶段传 true。
+    /// overwrite=true 时（翻译成功写译文）覆盖已有记录（含 translated 属性）；
     /// overwrite=false 时（记录英文原文）仅在尚无记录时写入，避免覆盖已成功的译文。
-    /// KeyedDir 为空（无激活语言）时直接跳过。
+    /// KeyedDir 为空（无激活语言/英文地区）时直接跳过。
     /// </summary>
-    public static void WriteAutoKey(string key, string value, bool overwrite = false)
+    public static void WriteAutoKey(string key, string value, bool translated, bool overwrite = false)
     {
         try
         {
@@ -97,10 +121,13 @@ public static class AutoXmlWriter
                 }
 
                 existing.Value = value;
+                existing.SetAttributeValue(TranslatedAttr, translated ? "true" : "false");
             }
             else
             {
-                root.Add(new XElement(key, value));
+                var el = new XElement(key, value);
+                el.SetAttributeValue(TranslatedAttr, translated ? "true" : "false");
+                root.Add(el);
             }
 
             doc.Save(AutoXmlPath);
@@ -112,12 +139,12 @@ public static class AutoXmlWriter
     }
 
     /// <summary>
-    /// 读取 auto.xml 中所有 key -> value 的映射。文件不存在返回空字典。
-    /// 供"一键翻译"判断哪些 key 的 value 仍等于默认语言内容（即未翻译）。
+    /// 读取 auto.xml 中所有 key -> <see cref="AutoKeyEntry"/> 的映射。文件不存在返回空字典。
+    /// 供"一键翻译"筛选 translated=false 的待翻译条目（不再依赖内容比对）。
     /// </summary>
-    public static Dictionary<string, string> LoadAutoKeys()
+    public static Dictionary<string, AutoKeyEntry> LoadAutoKeys()
     {
-        var result = new Dictionary<string, string>(System.StringComparer.Ordinal);
+        var result = new Dictionary<string, AutoKeyEntry>(System.StringComparer.Ordinal);
         try
         {
             if (KeyedDir == null || !File.Exists(AutoXmlPath))
@@ -133,10 +160,19 @@ public static class AutoXmlWriter
 
             foreach (XElement el in doc.Root.Elements())
             {
-                if (!string.IsNullOrEmpty(el.Name.LocalName))
+                if (string.IsNullOrEmpty(el.Name.LocalName))
                 {
-                    result[el.Name.LocalName] = el.Value ?? string.Empty;
+                    continue;
                 }
+
+                string attr = el.Attribute(TranslatedAttr)?.Value;
+                bool translated = string.Equals(attr, "true", System.StringComparison.OrdinalIgnoreCase);
+                result[el.Name.LocalName] = new AutoKeyEntry
+                {
+                    Key = el.Name.LocalName,
+                    Value = el.Value ?? string.Empty,
+                    Translated = translated
+                };
             }
         }
         catch (System.Exception ex)

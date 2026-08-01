@@ -18,8 +18,10 @@ public static class AutoTranslatorConstants
 
     /// <summary>
     /// 自动记录未翻译 key 时生成的翻译文件名，写入当前语言包的 Keyed 目录下。
-    /// 单文件承担两种角色：实时翻译开启时 value=译文；关闭时 value=默认语言（英文）原文内容。
-    /// "一键翻译"据此判断（value 与默认语言内容相同=未翻译，需调 API）。
+    /// 单文件承担两种角色：实时翻译开启时 value=译文（translated="true"）；
+    /// 关闭时 value=默认语言（英文）原文内容（translated="false"）。
+    /// "一键翻译"只挑 translated="false" 的条目提交，翻译成功后改写为 translated="true"，
+    /// 不依赖"value 是否等于原文"推断，杜绝引擎返回原文造成的死循环。
     /// </summary>
     public const string AutoXmlFileName = "auto.xml";
 }

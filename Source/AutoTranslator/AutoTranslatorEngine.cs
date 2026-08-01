@@ -105,8 +105,9 @@ public static class AutoTranslatorEngine
     }
 
     /// <summary>
-    /// 一键翻译：读取 auto.xml 中所有记录，对 value 仍等于默认语言内容的 key（即未翻译）
-    /// 批量提交翻译请求（强制覆盖在途去重），翻译成功写 auto.xml（value=译文）。
+    /// 一键翻译：读取 auto.xml，仅筛选 translated=false 的待翻译条目，
+    /// 批量提交翻译请求（强制覆盖在途去重），翻译成功写 auto.xml（translated=true）。
+    /// 不再依赖"value 是否等于原文"推断，彻底避免引擎返回原文导致的死循环。
     /// 引擎未启动或无需翻译时直接返回。
     /// </summary>
     public static void TranslateAllPending()
@@ -117,29 +118,33 @@ public static class AutoTranslatorEngine
             return;
         }
 
-        string defaultFolder = LanguageDatabase.defaultLanguage?.folderName;
-        string source = defaultFolder;
+        string source = LanguageDatabase.defaultLanguage?.folderName;
         string target = LanguageDatabase.activeLanguage?.folderName;
         if (source == null || target == null)
         {
             return;
         }
 
-        Dictionary<string, string> autoKeys = AutoXmlWriter.LoadAutoKeys();
+        Dictionary<string, AutoXmlWriter.AutoKeyEntry> autoKeys = AutoXmlWriter.LoadAutoKeys();
         int submitted = 0;
         foreach (var kv in autoKeys)
         {
             string key = kv.Key;
-            string recordedValue = kv.Value ?? string.Empty;
+            AutoXmlWriter.AutoKeyEntry entry = kv.Value;
 
-            // 取该 key 在默认语言包中的内容，与记录值比较：相同=未翻译，需调 API。
-            TaggedString defaultText;
-            LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out defaultText);
-            string defaultContent = defaultText.NullOrEmpty() ? key : defaultText.ToString();
-
-            if (!string.Equals(recordedValue, defaultContent, StringComparison.Ordinal))
+            // 仅提交未翻译（translated=false）的条目，已翻译的跳过。
+            if (entry.Translated)
             {
-                continue; // 已翻译（value 与默认语言内容不同），跳过
+                continue;
+            }
+
+            string fallback = entry.Value ?? string.Empty;
+            if (string.IsNullOrEmpty(fallback))
+            {
+                // 兜底：记录值为空时用 key 本身作为原文。
+                TaggedString defaultText;
+                LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out defaultText);
+                fallback = defaultText.NullOrEmpty() ? key : defaultText.ToString();
             }
 
             // 强制入队：绕过在途去重（这些 key 尚未翻译完成）。
@@ -153,7 +158,7 @@ public static class AutoTranslatorEngine
                 Key = key,
                 Source = source,
                 Target = target,
-                Fallback = defaultContent
+                Fallback = fallback
             });
             submitted++;
         }
@@ -212,7 +217,7 @@ public static class AutoTranslatorEngine
                 else
                 {
                     // 实时翻译关闭：仅把 key 与默认语言内容写入 auto.xml，不调 API、不回写内存。
-                    AutoXmlWriter.WriteAutoKey(job.Key, job.Fallback, overwrite: false);
+                    AutoXmlWriter.WriteAutoKey(job.Key, job.Fallback, translated: false, overwrite: false);
                 }
             }
             catch (Exception ex)
@@ -223,14 +228,14 @@ public static class AutoTranslatorEngine
             {
                 if (AutoTranslatorMod.RealtimeUpdateEnabled)
                 {
-                    // auto.xml：成功写译文（覆盖），失败写原文（不覆盖已有译文）。
+                    // auto.xml：成功写译文（translated=true，覆盖），失败写原文（translated=false，不覆盖已有译文）。
                     if (ok)
                     {
-                        AutoXmlWriter.WriteAutoKey(job.Key, translated, overwrite: true);
+                        AutoXmlWriter.WriteAutoKey(job.Key, translated, translated: true, overwrite: true);
                     }
                     else
                     {
-                        AutoXmlWriter.WriteAutoKey(job.Key, job.Fallback, overwrite: false);
+                        AutoXmlWriter.WriteAutoKey(job.Key, job.Fallback, translated: false, overwrite: false);
                     }
                 }
 
