@@ -22,8 +22,7 @@ public static class TranslationPatch
     {
         if (__result || key == null
             || !AutoTranslatorMod.AutoTranslateEnabled
-            || LanguageDatabase.activeLanguage == null
-            || LanguageDatabase.activeLanguage == LanguageDatabase.defaultLanguage)
+            || LanguageDatabase.activeLanguage == null)
         {
             return;
         }
@@ -32,8 +31,8 @@ public static class TranslationPatch
         LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out saveresult);
         string fallback = saveresult.NullOrEmpty() ? key : saveresult.ToString();
 
-        // 实时翻译开启：提交异步翻译，后台线程翻译完成后实时回写 RimWorld 字典并写 auto.xml。
-        // 实时翻译关闭：仅把 key 记录进 pending.xml 待翻译清单，不调用 API、不回写，
+        // 实时翻译开启：提交异步翻译，后台线程翻译完成后实时回写 RimWorld 字典并写 auto.xml（译文）。
+        // 实时翻译关闭：仅把 key 与默认语言内容写入 auto.xml（value=英文原文），不调 API、不回写内存，
         // 待玩家在设置页点击"一键翻译"批量处理。
         if (AutoTranslatorMod.RealtimeUpdateEnabled)
         {
@@ -45,7 +44,7 @@ public static class TranslationPatch
         }
         else
         {
-            AutoTranslatorEngine.RecordPending(key, fallback);
+            AutoXmlWriter.WriteAutoKey(key, fallback, overwrite: false);
         }
     }
 }

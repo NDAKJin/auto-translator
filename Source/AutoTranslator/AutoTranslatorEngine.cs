@@ -9,12 +9,18 @@ namespace nomadicooer.AutoTranslator;
 /// <summary>
 /// 自动翻译引擎（消费层，异步）。
 /// 主线程遇到未翻译 key 时调用 <see cref="RequestTranslate"/> 入队（不阻塞）；
-/// 后台线程从队列取任务，调用 <see cref="TranslationDispatcher"/>（其内部为同步阻塞实现）翻译，
-    /// 拿到译文后：
-    ///   1) 写进 RimWorld 当前激活语言的 keyedReplacements 字典（实时生效，下次查询该 key 即命中，无需重载语言包）；
-    ///   2) 存入内存 cache（已翻译的 key 不再请求 API）；
-    ///   3) 写 auto.xml：翻译成功写译文，失败写原文（fallback）。
-    /// 已翻译的 key 通过 cache + pending 双层去重，绝不重复打 API。
+/// 后台线程从队列取任务，调用 <see cref="TranslationDispatcher"/>（其内部为同步阻塞实现）翻译。
+///
+/// 两种模式（由设置"启用实时翻译"决定）：
+///   实时翻译开启：调 API 翻译 -> 1) 写 RimWorld 当前语言 keyedReplacements（实时回写内存，下次查询即命中）；
+///                                 2) 存内存 cache（已翻译 key 不再请求 API）；
+///                                 3) 写 auto.xml（value=译文）。
+///   实时翻译关闭：不调 API、不回写内存，仅把 key 与默认语言内容写入 auto.xml（value=英文原文），
+///                 供后续"一键翻译"批量消费。
+///
+/// auto.xml 的 value 含义：等于默认语言内容 = 未翻译；已翻译 = 译文。
+/// "一键翻译"据此判断是否需要调 API。
+/// 已翻译的 key 通过 cache + pending 双层去重，绝不重复打 API。
 /// 切换语言概率极低，未做完整兼容：后台线程检测到 activeLanguage 已变则跳过回写（不崩，仅该批译文不生效）。
 /// </summary>
 public static class AutoTranslatorEngine
@@ -24,10 +30,7 @@ public static class AutoTranslatorEngine
         public string Key;
         public string Source;
         public string Target;
-        public string Fallback; // 翻译失败时的回退原文（写 auto.xml 用）
-        // true=仅记录模式：不调 API、不写 auto.xml，只把 key 追加进 pending.xml。
-        // 由 RecordPending 提交；或由实时翻译关闭时消费循环降级处理。
-        public bool RecordOnly;
+        public string Fallback; // 默认语言（英文）原文内容，用于记录/回退
     }
 
     // 待翻译队列：后台线程从此处取任务。BlockingCollection 在 .NET Framework 4.0+ 可用。
@@ -82,23 +85,10 @@ public static class AutoTranslatorEngine
     }
 
     /// <summary>
-    /// 提交一条翻译请求。立即返回，不阻塞主线程。
+    /// 提交一条翻译请求（实时翻译开启时使用）。立即返回，不阻塞主线程。
     /// 已翻译（命中 cache）或在途（命中 pending）的 key 会被去重，不重复打 API。
     /// 引擎未启动（未 Configure）时直接忽略。
     /// </summary>
-    /// <param name="key">未翻译的翻译键（即 RimWorld 原文文本）。</param>
-    /// <param name="source">源语言（RimWorld 语言文件夹名，如 "English"）。</param>
-    /// <param name="target">目标语言（RimWorld 语言文件夹名，如 "ChineseSimplified (简体中文)"）。</param>
-    /// <param name="fallback">翻译失败时的回退原文，用于写 auto.xml。</param>
-    /// <summary>
-    /// 提交一条翻译请求。立即返回，不阻塞主线程。
-    /// 已翻译（命中 cache）或在途（命中 pending）的 key 会被去重，不重复打 API。
-    /// 引擎未启动（未 Configure）时直接忽略。
-    /// </summary>
-    /// <param name="key">未翻译的翻译键（即 RimWorld 原文文本）。</param>
-    /// <param name="source">源语言（RimWorld 语言文件夹名，如 "English"）。</param>
-    /// <param name="target">目标语言（RimWorld 语言文件夹名，如 "ChineseSimplified (简体中文)"）。</param>
-    /// <param name="fallback">翻译失败时的回退原文，用于写 auto.xml。</param>
     public static void RequestTranslate(string key, string source, string target, string fallback)
     {
         if (!_running || key == null)
@@ -111,27 +101,13 @@ public static class AutoTranslatorEngine
             return; // 已翻译，直接返回，不请求 API
         }
 
-        Enqueue(key, source, target, fallback, recordOnly: false);
+        Enqueue(key, source, target, fallback);
     }
 
     /// <summary>
-    /// 仅记录模式：把未翻译 key 追加进 pending.xml 待翻译清单，不调 API、不写 auto.xml。
-    /// 用于"实时翻译"关闭时拦截到的 key。引擎未启动或已翻译的 key 会被忽略。
-    /// </summary>
-    public static void RecordPending(string key, string fallback)
-    {
-        if (!_running || key == null || Cache.ContainsKey(key))
-        {
-            return;
-        }
-
-        Enqueue(key, null, null, fallback, recordOnly: true);
-    }
-
-    /// <summary>
-    /// 一键翻译：读取 pending.xml 中的待翻译 key，批量提交翻译请求（强制覆盖在途去重，
-    /// 因为 pending 的 key 本就未翻译完成）。翻译成功写 auto.xml 并从 pending 移除。
-    /// 引擎未启动或 pending 为空时直接返回。
+    /// 一键翻译：读取 auto.xml 中所有记录，对 value 仍等于默认语言内容的 key（即未翻译）
+    /// 批量提交翻译请求（强制覆盖在途去重），翻译成功写 auto.xml（value=译文）。
+    /// 引擎未启动或无需翻译时直接返回。
     /// </summary>
     public static void TranslateAllPending()
     {
@@ -141,28 +117,32 @@ public static class AutoTranslatorEngine
             return;
         }
 
-        HashSet<string> pending = AutoXmlWriter.LoadPendingKeys();
-        if (pending.Count == 0)
-        {
-            Logger.Message("待翻译清单为空，无需一键翻译。");
-            return;
-        }
-
-        string source = LanguageDatabase.defaultLanguage?.folderName;
+        string defaultFolder = LanguageDatabase.defaultLanguage?.folderName;
+        string source = defaultFolder;
         string target = LanguageDatabase.activeLanguage?.folderName;
         if (source == null || target == null)
         {
             return;
         }
 
-        foreach (string key in pending)
+        Dictionary<string, string> autoKeys = AutoXmlWriter.LoadAutoKeys();
+        int submitted = 0;
+        foreach (var kv in autoKeys)
         {
-            // 用 pending fallback（暂无原文时退化为 key 本身）。
-            TaggedString saveresult;
-            LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out saveresult);
-            string fallback = saveresult.NullOrEmpty() ? key : saveresult.ToString();
+            string key = kv.Key;
+            string recordedValue = kv.Value ?? string.Empty;
 
-            // 强制入队：绕过在途去重（pending key 尚未翻译完成）。
+            // 取该 key 在默认语言包中的内容，与记录值比较：相同=未翻译，需调 API。
+            TaggedString defaultText;
+            LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out defaultText);
+            string defaultContent = defaultText.NullOrEmpty() ? key : defaultText.ToString();
+
+            if (!string.Equals(recordedValue, defaultContent, StringComparison.Ordinal))
+            {
+                continue; // 已翻译（value 与默认语言内容不同），跳过
+            }
+
+            // 强制入队：绕过在途去重（这些 key 尚未翻译完成）。
             lock (PendingLock)
             {
                 Pending.Add(key);
@@ -173,15 +153,22 @@ public static class AutoTranslatorEngine
                 Key = key,
                 Source = source,
                 Target = target,
-                Fallback = fallback,
-                RecordOnly = false
+                Fallback = defaultContent
             });
+            submitted++;
         }
 
-        Logger.Message(string.Format("已提交 {0} 个待翻译 key 至一键翻译队列。", pending.Count));
+        if (submitted == 0)
+        {
+            Logger.Message("auto.xml 中没有需要翻译的 key。");
+        }
+        else
+        {
+            Logger.Message(string.Format("已提交 {0} 个待翻译 key 至一键翻译队列。", submitted));
+        }
     }
 
-    private static void Enqueue(string key, string source, string target, string fallback, bool recordOnly)
+    private static void Enqueue(string key, string source, string target, string fallback)
     {
         lock (PendingLock)
         {
@@ -198,8 +185,7 @@ public static class AutoTranslatorEngine
             Key = key,
             Source = source,
             Target = target,
-            Fallback = fallback,
-            RecordOnly = recordOnly
+            Fallback = fallback
         });
     }
 
@@ -211,14 +197,9 @@ public static class AutoTranslatorEngine
             string translated = null;
             try
             {
-                // 仅记录模式（或实时翻译已关闭）：只把 key 追加进 pending.xml，不调 API、不写 auto.xml。
-                bool recordOnly = job.RecordOnly || !AutoTranslatorMod.RealtimeUpdateEnabled;
-                if (recordOnly)
+                if (AutoTranslatorMod.RealtimeUpdateEnabled)
                 {
-                    AutoXmlWriter.AddPendingKey(job.Key);
-                }
-                else
-                {
+                    // 实时翻译开启：调 API 翻译 -> 回写内存 -> 写 auto.xml（译文）
                     TranslationResult result = _dispatcher.Translate(job.Source, job.Target, job.Fallback);
                     if (result.Success && !string.IsNullOrEmpty(result.TranslatedText))
                     {
@@ -228,6 +209,11 @@ public static class AutoTranslatorEngine
                         WriteToRimWorld(job.Key, translated);
                     }
                 }
+                else
+                {
+                    // 实时翻译关闭：仅把 key 与默认语言内容写入 auto.xml，不调 API、不回写内存。
+                    AutoXmlWriter.WriteAutoKey(job.Key, job.Fallback, overwrite: false);
+                }
             }
             catch (Exception ex)
             {
@@ -235,14 +221,12 @@ public static class AutoTranslatorEngine
             }
             finally
             {
-                if (!job.RecordOnly && AutoTranslatorMod.RealtimeUpdateEnabled)
+                if (AutoTranslatorMod.RealtimeUpdateEnabled)
                 {
                     // auto.xml：成功写译文（覆盖），失败写原文（不覆盖已有译文）。
                     if (ok)
                     {
                         AutoXmlWriter.WriteAutoKey(job.Key, translated, overwrite: true);
-                        // 翻译成功：从待翻译清单移除（若此前以 recordOnly 记录过）。
-                        AutoXmlWriter.RemovePendingKeys(new[] { job.Key });
                     }
                     else
                     {

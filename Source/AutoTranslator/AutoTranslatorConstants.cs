@@ -18,12 +18,8 @@ public static class AutoTranslatorConstants
 
     /// <summary>
     /// 自动记录未翻译 key 时生成的翻译文件名，写入当前语言包的 Keyed 目录下。
+    /// 单文件承担两种角色：实时翻译开启时 value=译文；关闭时 value=默认语言（英文）原文内容。
+    /// "一键翻译"据此判断（value 与默认语言内容相同=未翻译，需调 API）。
     /// </summary>
     public const string AutoXmlFileName = "auto.xml";
-
-    /// <summary>
-    /// 待翻译清单文件名（仅记录未翻译 key、不写译文），写入当前语言包的 Keyed 目录下。
-    /// 当"实时翻译"关闭时，拦截到的 key 仅追加到此文件；玩家点击"一键翻译"后批量消费。
-    /// </summary>
-    public const string PendingXmlFileName = "pending.xml";
 }
