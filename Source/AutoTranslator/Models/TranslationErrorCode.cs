@@ -1,4 +1,4 @@
-namespace nomadicooer.AutoTranslator.Models;
+namespace nomadicooer.AutoTranslator;
 
 /// <summary>
 /// 翻译平台统一的错误码（跨阿里云/百度/火山一致）。

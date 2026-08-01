@@ -8,7 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace nomadicooer.AutoTranslator.Models;
+namespace nomadicooer.AutoTranslator;
 
 /// <summary>
 /// 阿里云机器翻译（Alimt）开放平台。

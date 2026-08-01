@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 
-namespace nomadicooer.AutoTranslator.Models;
+namespace nomadicooer.AutoTranslator;
 
 /// <summary>
 /// RimWorld 语言包名称解析辅助。

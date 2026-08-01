@@ -1,4 +1,4 @@
-namespace nomadicooer.AutoTranslator.Models;
+namespace nomadicooer.AutoTranslator;
 
 /// <summary>
 /// 单次翻译调用的聚合结果。

@@ -8,7 +8,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace nomadicooer.AutoTranslator.Models;
+namespace nomadicooer.AutoTranslator;
 
 /// <summary>
 /// 火山引擎（Volcengine）机器翻译平台。
