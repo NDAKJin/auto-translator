@@ -90,8 +90,9 @@ public class AutoTranslatorMod : Mod
                 AutoTranslatorSettings.EnableAutoTranslateKey.Translate(),
                 ref settings.EnableAutoTranslate);
 
-            // 翻译平台：上方列表（勾选启用哪些平台）
-            listing.Label(AutoTranslatorSettings.PlatformListHeaderKey.Translate());
+            // 翻译平台：上方列表（勾选启用哪些平台）—— 作为加粗放大的 section 标题渲染。
+            // 直接用 Text.Font + Widgets.Label 自绘比改 Listing_Standard 更轻量。
+            DrawSectionHeader(listing, AutoTranslatorSettings.PlatformListHeaderKey.Translate());
             foreach (string platformId in AutoTranslatorSettings.PlatformIds)
             {
                 bool enabled = platformChecks[platformId];
@@ -104,25 +105,33 @@ public class AutoTranslatorMod : Mod
 
             // 下方凭据区域：每行凭据使用 TextEntryLabeled，
             // label 自带"平台名 · 字段"标识，避免与全局表头混淆。
+            // 标题行同时是可点击的折叠头（左侧三角形 ▶/▼ 指示折叠状态）。
             listing.Gap(12f);
-            listing.Label(AutoTranslatorSettings.CredentialTableHeaderKey.Translate());
+            DrawCollapsibleSectionHeader(
+                listing,
+                settings,
+                AutoTranslatorSettings.CredentialTableHeaderKey.Translate());
 
-            foreach (PlatformCredential cred in settings.Credentials)
+            // 折叠状态下不渲染凭据编辑控件，节省设置页高度。
+            if (!settings.CredentialsCollapsed)
             {
-                listing.Gap(8f);
+                foreach (PlatformCredential cred in settings.Credentials)
+                {
+                    listing.Gap(8f);
 
-                // 平台名（小标题）
-                string platformLabel = AutoTranslatorSettings.PlatformLabelKeys.TryGetValue(
-                    cred.PlatformId, out string key) ? key.Translate() : cred.PlatformId;
-                listing.Label(platformLabel);
+                    // 平台名（小标题）
+                    string platformLabel = AutoTranslatorSettings.PlatformLabelKeys.TryGetValue(
+                        cred.PlatformId, out string key) ? key.Translate() : cred.PlatformId;
+                    listing.Label(platformLabel);
 
-                // 访问键 + 密钥：两行 TextEntryLabeled，label 自带"平台名 · 字段"。
-                string accessKey = AutoTranslatorSettings.AccessKeyLabelKey.Translate();
-                string secretKey = AutoTranslatorSettings.SecretKeyLabelKey.Translate();
-                cred.AccessKey = listing.TextEntryLabeled(
-                    platformLabel + " · " + accessKey, cred.AccessKey);
-                cred.SecretKey = listing.TextEntryLabeled(
-                    platformLabel + " · " + secretKey, cred.SecretKey);
+                    // 访问键 + 密钥：两行 TextEntryLabeled，label 自带"平台名 · 字段"。
+                    string accessKey = AutoTranslatorSettings.AccessKeyLabelKey.Translate();
+                    string secretKey = AutoTranslatorSettings.SecretKeyLabelKey.Translate();
+                    cred.AccessKey = listing.TextEntryLabeled(
+                        platformLabel + " · " + accessKey, cred.AccessKey);
+                    cred.SecretKey = listing.TextEntryLabeled(
+                        platformLabel + " · " + secretKey, cred.SecretKey);
+                }
             }
 
             // 重置默认按钮：清空所有凭据与开关，恢复到首次安装时的初始状态。
@@ -163,5 +172,68 @@ public class AutoTranslatorMod : Mod
         // WriteSettings 是 Verse.Mod 的方法（Mod 实例持有 ModSettings 引用），
         // 会序列化 settings.ExposeData 中的字段到 {ModId}.xml。
         WriteSettings();
+    }
+
+    /// <summary>
+    /// 用 listing 自带的纵向推进绘制一个加粗放大的 section 标题，画完恢复字体。
+    /// </summary>
+    private static void DrawSectionHeader(Listing_Standard listing, string text)
+    {
+        // Verse 没有 Widgets.ButtonTextHeight 这类便捷常量，按 Medium 字号近似行高取 30f。
+        const float HeaderHeight = 30f;
+        UnityEngine.Rect rect = listing.GetRect(HeaderHeight);
+        GameFont previous = Text.Font;
+        Text.Font = GameFont.Medium;
+        try
+        {
+            Widgets.Label(rect, text);
+        }
+        finally
+        {
+            Text.Font = previous;
+        }
+        listing.Gap(4f);
+    }
+
+    /// <summary>
+    /// 绘制加粗放大的可折叠 section 标题：左侧 ▶/▼ 三角形指示折叠状态，
+    /// 整行可点击切换 bool 折叠状态。settings 字段为 ref，运行时切换即生效。
+    /// </summary>
+    private static void DrawCollapsibleSectionHeader(
+        Listing_Standard listing, AutoTranslatorSettings settings, string text)
+    {
+        const float TriangleWidth = 18f;
+        const float HeaderHeight = 30f;
+        UnityEngine.Rect rect = listing.GetRect(HeaderHeight);
+        GameFont previous = Text.Font;
+        Text.Font = GameFont.Medium;
+        try
+        {
+            // 左侧三角形（▶ 折叠中 / ▼ 展开）
+            UnityEngine.Rect triangleRect = new UnityEngine.Rect(
+                rect.x, rect.y, TriangleWidth, rect.height);
+            Widgets.Label(
+                triangleRect,
+                settings.CredentialsCollapsed ? "▶" : "▼");
+
+            // 右侧标题文字
+            UnityEngine.Rect textRect = new UnityEngine.Rect(
+                rect.x + TriangleWidth,
+                rect.y,
+                rect.width - TriangleWidth,
+                rect.height);
+            Widgets.Label(textRect, text);
+
+            // 整行可点击：仅在鼠标按下时切换（ButtonInvisible 会消费点击事件）
+            if (Widgets.ButtonInvisible(rect))
+            {
+                settings.CredentialsCollapsed = !settings.CredentialsCollapsed;
+            }
+        }
+        finally
+        {
+            Text.Font = previous;
+        }
+        listing.Gap(4f);
     }
 }

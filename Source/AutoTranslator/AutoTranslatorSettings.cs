@@ -58,9 +58,19 @@ public class AutoTranslatorSettings : ModSettings
     public bool EnableAutoTranslate = true;
 
     /// <summary>
+    /// 设置页"凭据"区域是否折叠（true=折叠隐藏所有平台凭据，false=展开）。
+    /// </summary>
+    public bool CredentialsCollapsed = false;
+
+    /// <summary>
     /// 设置持久化键名：是否启用自动翻译（总开关）。
     /// </summary>
     public const string EnableAutoTranslateScribeKey = "enableAutoTranslate";
+
+    /// <summary>
+    /// 设置持久化键名：凭据区域是否折叠。
+    /// </summary>
+    public const string CredentialsCollapsedScribeKey = "credentialsCollapsed";
 
     /// <summary>
     /// 设置页分类的翻译键名（SettingsCategory）。
@@ -119,6 +129,7 @@ public class AutoTranslatorSettings : ModSettings
     {
         base.ExposeData();
         Scribe_Values.Look(ref EnableAutoTranslate, EnableAutoTranslateScribeKey, true);
+        Scribe_Values.Look(ref CredentialsCollapsed, CredentialsCollapsedScribeKey, false);
         Scribe_Collections.Look(ref credentials, "credentials", LookMode.Deep);
         // 读档失败时 Scribe 可能把 credentials 置 null，兜底重建空列表。
         if (credentials == null)
@@ -164,5 +175,6 @@ public class AutoTranslatorSettings : ModSettings
     {
         Credentials.Clear();
         EnableAutoTranslate = true;
+        CredentialsCollapsed = false;
     }
 }
