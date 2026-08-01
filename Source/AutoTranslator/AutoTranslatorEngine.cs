@@ -48,6 +48,11 @@ public static class AutoTranslatorEngine
     private static readonly ConcurrentDictionary<string, byte> Pending =
         new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
 
+    // 翻译成功回调：keyed 路径不传（译文走 keyedReplacements 回写），UI 字符串拦截等非 keyed 入口
+    // 需要自定义落地（如自己的内存缓存），通过回调拿译文，与 keyed 系统解耦。
+    private static readonly ConcurrentDictionary<string, Action<string, string>> Callbacks =
+        new ConcurrentDictionary<string, Action<string, string>>(StringComparer.Ordinal);
+
     private static TranslationDispatcher _dispatcher;
     private static bool _running;
     private static readonly object EngineLock = new object();
@@ -244,8 +249,11 @@ public static class AutoTranslatorEngine
     /// 提交一条翻译请求（实时翻译开启时使用）。立即返回，不阻塞主线程。
     /// 已翻译（命中 cache）或在途（命中 pending）的 key 会被去重，不重复打 API。
     /// 引擎未启用（未 Configure）时直接忽略。
+    /// onTranslated：翻译成功回调（可选），用于非 keyed 入口（如 UI 字符串拦截）自定义落地译文；
+    /// keyed 路径不传，译文走 keyedReplacements 回写。
     /// </summary>
-    public static void RequestTranslate(string key, string source, string target, string fallback)
+    public static void RequestTranslate(string key, string source, string target, string fallback,
+        Action<string, string> onTranslated = null)
     {
         if (!_running || key == null)
         {
@@ -257,7 +265,7 @@ public static class AutoTranslatorEngine
             return; // 已翻译，直接返回，不请求 API
         }
 
-        Submit(key, source, target, fallback);
+        Submit(key, source, target, fallback, onTranslated);
     }
 
     /// <summary>
@@ -321,12 +329,18 @@ public static class AutoTranslatorEngine
     /// 在途去重后用 Task.Run 触发一次性后台翻译任务。返回是否实际提交。
     /// 任务内先等信号量（限流），拿到名额才真正打 API；跑完释放名额并移除 pending，任务自然结束。
     /// </summary>
-    private static bool Submit(string key, string source, string target, string fallback)
+    private static bool Submit(string key, string source, string target, string fallback,
+        Action<string, string> onTranslated = null)
     {
         // TryAdd 原子操作：已在途则返回 false，不重复提交。
         if (!Pending.TryAdd(key, 0))
         {
             return false;
+        }
+
+        if (onTranslated != null)
+        {
+            Callbacks[key] = onTranslated;
         }
 
         Task.Run(() => RunTranslateTask(key, source, target, fallback));
@@ -367,6 +381,13 @@ public static class AutoTranslatorEngine
                         translated = sanitized;
                         Cache[key] = translated;
                         WriteToRimWorld(key, translated);
+
+                        // 非 keyed 入口（如 UI 字符串拦截）的成功回调：自定义落地译文。
+                        Action<string, string> cb;
+                        if (Callbacks.TryGetValue(key, out cb) && cb != null)
+                        {
+                            cb(key, translated);
+                        }
                     }
                 }
             }
@@ -400,6 +421,8 @@ public static class AutoTranslatorEngine
 
             byte ignored;
             Pending.TryRemove(key, out ignored);
+            Action<string, string> cbIgnored;
+            Callbacks.TryRemove(key, out cbIgnored);
         }
     }
 
