@@ -139,7 +139,6 @@ public class VolcengineTranslate : TranslatePlatform
                          + "\",\"TextList\":[\"" + JsonEscape(text) + "\"]}";
 
         // 请求逻辑包进节流器：自动控制 QPS，撞到限流码时指数退避重试
-        return ExecuteWithThrottle(() =>
         {
             try
             {
@@ -170,21 +169,7 @@ public class VolcengineTranslate : TranslatePlatform
                 Debug.WriteLine("[AutoTranslator] 火山翻译请求失败: " + ex.Message);
                 return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译请求失败: " + ex.Message);
             }
-        });
-    }
-
-    /// <summary>
-    /// 火山文本翻译默认限额较宽松，此处保守设为 100ms 间隔（约 10 QPS）。
-    /// </summary>
-    protected override int MinIntervalMs => 100;
-
-    /// <summary>
-    /// 判定是否为可重试的限流/临时错误（统一错误码层：ErrorCode == RateLimited）。
-    /// 由 <see cref="MapVolcErrorCode"/> 已把平台码映射为统一码。
-    /// </summary>
-    protected override bool IsRateLimitError(TranslationErrorCode errorCode)
-    {
-        return errorCode == TranslationErrorCode.RateLimited;
+        }
     }
 
     /// <summary>

@@ -93,7 +93,6 @@ public class BaiduTranslate : TranslatePlatform
         }
 
         // 请求逻辑包进节流器：自动控制 QPS，撞到限流码时指数退避重试
-        return ExecuteWithThrottle(() =>
         {
             try
             {
@@ -135,22 +134,7 @@ public class BaiduTranslate : TranslatePlatform
                 Debug.WriteLine("[AutoTranslator] 百度翻译请求失败: " + ex.Message);
                 return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "百度翻译请求失败: " + ex.Message);
             }
-        });
-    }
-
-    /// <summary>
-    /// 百度标准版限制 1 QPS，故两次请求最少间隔 1 秒。
-    /// 高级版/尊享版 QPS 更高，可下调此值以提升批量翻译速度。
-    /// </summary>
-    protected override int MinIntervalMs => 1000;
-
-    /// <summary>
-    /// 判定是否为可重试的限流/临时错误（统一错误码层：ErrorCode == RateLimited）。
-    /// 由 <see cref="MapBaiduErrorCode"/> 已把平台码映射为统一码。
-    /// </summary>
-    protected override bool IsRateLimitError(TranslationErrorCode errorCode)
-    {
-        return errorCode == TranslationErrorCode.RateLimited;
+        }
     }
 
     /// <summary>
