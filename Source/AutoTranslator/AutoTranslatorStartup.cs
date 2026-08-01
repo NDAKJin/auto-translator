@@ -25,8 +25,10 @@ public static class AutoTranslatorStartup
         Harmony.PatchAll();
 
         // 构建翻译调度器：仅注册已在设置中填入凭据的平台，避免空凭据打 API 浪费。
+        // 总开关关闭时（EnableAutoTranslate=false）不启动引擎：不再调用翻译 API、不再写新 key，
+        // 但本模组仍加载，已写入的 auto.xml 译文继续随语言包生效。
         var settings = AutoTranslatorMod.Settings;
-        if (settings != null)
+        if (settings != null && AutoTranslatorMod.AutoTranslateEnabled)
         {
             var sources = new List<TranslatePlatform>();
             foreach (PlatformCredential cred in settings.Credentials)

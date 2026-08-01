@@ -21,6 +21,7 @@ public static class TranslationPatch
     public static void TryTranslatePostfix(string key, ref TaggedString result, ref bool __result)
     {
         if (__result || key == null
+            || !AutoTranslatorMod.AutoTranslateEnabled
             || !AutoTranslatorMod.KeyRecordingEnabled
             || !AutoTranslatorMod.RealtimeUpdateEnabled
             || LanguageDatabase.activeLanguage == null

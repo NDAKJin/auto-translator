@@ -29,6 +29,13 @@ public class AutoTranslatorMod : Mod
     public static bool RealtimeUpdateEnabled => Instance?.settings.EnableRealtimeUpdate ?? true;
 
     /// <summary>
+    /// 是否启用自动翻译（总开关，供 TranslationPatch / Engine 在静态上下文读取）。
+    /// 关闭后引擎停止、不再调用翻译 API、不再写新 key，
+    /// 但本模组仍加载，已写入的 auto.xml 译文继续随语言包生效。
+    /// </summary>
+    public static bool AutoTranslateEnabled => Instance?.settings.EnableAutoTranslate ?? true;
+
+    /// <summary>
     /// 模组设置实例（供启动初始化等静态上下文读取凭据等）。
     /// </summary>
     public static AutoTranslatorSettings Settings => Instance?.settings;
@@ -86,6 +93,11 @@ public class AutoTranslatorMod : Mod
             listing.Label(
                 AutoTranslatorSettings.DefaultLanguageKey.Translate(
                     LanguageDatabase.defaultLanguage?.DisplayName ?? "—"));
+
+            // 是否启用自动翻译（总开关，置于最上方）
+            listing.CheckboxLabeled(
+                AutoTranslatorSettings.EnableAutoTranslateKey.Translate(),
+                ref settings.EnableAutoTranslate);
 
             // 是否启用翻译键记录
             listing.CheckboxLabeled(

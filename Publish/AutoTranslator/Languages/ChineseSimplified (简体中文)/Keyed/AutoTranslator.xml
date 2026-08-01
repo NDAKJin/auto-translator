@@ -4,6 +4,7 @@
   <AutoTranslator.SettingsCategory>自动翻译</AutoTranslator.SettingsCategory>
   <AutoTranslator.ActiveLanguage>当前语言：{0}</AutoTranslator.ActiveLanguage>
   <AutoTranslator.DefaultLanguage>默认语言：{0}</AutoTranslator.DefaultLanguage>
+  <AutoTranslator.EnableAutoTranslate>启用自动翻译</AutoTranslator.EnableAutoTranslate>
   <AutoTranslator.EnableKeyRecording>记录未翻译的翻译键</AutoTranslator.EnableKeyRecording>
   <AutoTranslator.EnableRealtimeUpdate>实时翻译</AutoTranslator.EnableRealtimeUpdate>
   <AutoTranslator.VolcengineAccessKey>火山引擎 AccessKey</AutoTranslator.VolcengineAccessKey>

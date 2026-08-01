@@ -51,6 +51,13 @@ public class AutoTranslatorSettings : ModSettings
         { "Baidu", AutoTranslatorConstants.TranslationKeyPrefix + "Baidu" }
     };
     /// <summary>
+    /// 是否启用自动翻译（总开关）。
+    /// 关闭后引擎停止、不再调用翻译 API、不再写新 key，
+    /// 但本模组仍加载，已写入的 auto.xml 译文继续随语言包生效。
+    /// </summary>
+    public bool EnableAutoTranslate = true;
+
+    /// <summary>
     /// 是否在翻译失败时记录未翻译的 key 到当前语言包的 auto.xml。
     /// </summary>
     public bool EnableKeyRecording = true;
@@ -60,6 +67,11 @@ public class AutoTranslatorSettings : ModSettings
     /// 关闭时仅回退显示、不记录未翻译 key。
     /// </summary>
     public bool EnableRealtimeUpdate = true;
+
+    /// <summary>
+    /// 设置持久化键名：是否启用自动翻译（总开关）。
+    /// </summary>
+    public const string EnableAutoTranslateScribeKey = "enableAutoTranslate";
 
     /// <summary>
     /// 设置持久化键名：是否启用翻译键记录。
@@ -97,6 +109,11 @@ public class AutoTranslatorSettings : ModSettings
     public const string EnableRealtimeUpdateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableRealtimeUpdate";
 
     /// <summary>
+    /// 设置页"是否启用自动翻译"复选框的翻译键名。
+    /// </summary>
+    public const string EnableAutoTranslateKey = AutoTranslatorConstants.TranslationKeyPrefix + "EnableAutoTranslate";
+
+    /// <summary>
     /// 设置页"可用平台"列表标题的翻译键名。
     /// </summary>
     public const string PlatformListHeaderKey = AutoTranslatorConstants.TranslationKeyPrefix + "PlatformList";
@@ -132,6 +149,7 @@ public class AutoTranslatorSettings : ModSettings
     public override void ExposeData()
     {
         base.ExposeData();
+        Scribe_Values.Look(ref EnableAutoTranslate, EnableAutoTranslateScribeKey, true);
         Scribe_Values.Look(ref EnableKeyRecording, EnableKeyRecordingScribeKey, true);
         Scribe_Values.Look(ref EnableRealtimeUpdate, EnableRealtimeUpdateScribeKey, true);
         Scribe_Collections.Look(ref credentials, "credentials", LookMode.Deep);
@@ -178,6 +196,7 @@ public class AutoTranslatorSettings : ModSettings
     public void ResetToDefaults()
     {
         Credentials.Clear();
+        EnableAutoTranslate = true;
         EnableKeyRecording = true;
         EnableRealtimeUpdate = true;
     }
