@@ -3,54 +3,52 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using Verse;
 
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>
-/// 自动翻译引擎（消费层，异步）。
-/// 主线程遇到未翻译 key 时调用 <see cref="RequestTranslate"/> 入队（不阻塞）；
-/// 后台线程从队列取任务，调用 <see cref="TranslationDispatcher"/>（其内部为同步阻塞实现）翻译。
+/// 自动翻译引擎（消费层，任务触发式异步）。
+/// 主线程遇到未翻译 key 时调用 <see cref="RequestTranslate"/>，内部用 Task.Run 触发一次性后台任务，
+/// 调用 <see cref="TranslationDispatcher"/>（其内部为同步阻塞实现）翻译，翻完即退出，不占用常驻线程。
+/// 并发量由 <see cref="Throttle"/>（SemaphoreSlim）限制，避免瞬间大量 key 打爆 API 配额。
+///
+/// 为什么需要"回写内存"（<see cref="WriteToRimWorld"/>）：
+///   Translator.TryTranslate 命中 keyedReplacements 即返回 true，postfix 不再进入。
+///   回写后下一帧即显示译文（本局生效）；auto.xml 则负责持久化（下次启动免重复调 API）。
+///   二者职责不同，缺一不可。
 ///
 /// 两种模式（由设置"启用实时翻译"决定）：
-///   实时翻译开启：调 API 翻译 -> 1) 写 RimWorld 当前语言 keyedReplacements（实时回写内存，下次查询即命中）；
+///   实时翻译开启：调 API 翻译 -> 1) 回写 keyedReplacements（投递主线程执行，下一帧命中）；
 ///                                 2) 存内存 cache（已翻译 key 不再请求 API）；
 ///                                 3) 写 auto.xml（value=译文）。
-///   实时翻译关闭：不调 API、不回写内存，仅把 key 与默认语言内容写入 auto.xml（value=英文原文），
-///                 供后续"一键翻译"批量消费。
+///   实时翻译关闭：TranslationPatch 直接写 auto.xml，根本不进入本引擎。
 ///
-/// auto.xml 的 value 含义：等于默认语言内容 = 未翻译；已翻译 = 译文。
+/// auto.xml 的 value 含义：translated=false 为未翻译（value=英文原文），true 为已翻译（value=译文）。
 /// "一键翻译"据此判断是否需要调 API。
 /// 已翻译的 key 通过 cache + pending 双层去重，绝不重复打 API。
-/// 切换语言概率极低，未做完整兼容：后台线程检测到 activeLanguage 已变则跳过回写（不崩，仅该批译文不生效）。
+/// 切换语言概率极低，未做完整兼容：回写时检测到 activeLanguage 已变则跳过（不崩，仅该批译文不生效）。
 /// </summary>
 public static class AutoTranslatorEngine
 {
-    private sealed class Job
-    {
-        public string Key;
-        public string Source;
-        public string Target;
-        public string Fallback; // 默认语言（英文）原文内容，用于记录/回退
-    }
+    /// <summary>
+    /// 后台翻译任务的最大并发数。RimWorld 启动/进入界面时可能瞬间涌入大量未翻译 key，
+    /// 不限流会同时发起成百上千个 HTTP 请求，既打爆第三方 API 配额也拖垮线程池。
+    /// </summary>
+    private const int MaxConcurrency = 4;
 
-    // 待翻译队列：后台线程从此处取任务。BlockingCollection 在 .NET Framework 4.0+ 可用。
-    // 非 readonly：Stop 后需要重建新队列供重新启动时消费（CompleteAdding 后的集合不可再用）。
-    private static BlockingCollection<Job> Queue = new BlockingCollection<Job>();
+    private static readonly SemaphoreSlim Throttle = new SemaphoreSlim(MaxConcurrency, MaxConcurrency);
 
-    // 已翻译结果缓存：原文 key -> 译文。后台线程写、主线程（经 TryTranslate 命中）间接读。
+    // 已翻译结果缓存：原文 key -> 译文。后台任务写、主线程（经 RequestTranslate 去重）读。
     private static readonly ConcurrentDictionary<string, string> Cache =
         new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
 
-    // 在途去重：译文回来前同一 key 只入队一次。
-    private static readonly HashSet<string> Pending = new HashSet<string>(StringComparer.Ordinal);
-    private static readonly object PendingLock = new object();
-
-    // 保护 keyedReplacements 的并发读写（后台线程写、RimWorld 主线程经 TryGetTextFromKey 读）。
-    private static readonly object DictLock = new object();
+    // 在途去重：译文回来前同一 key 只提交一次。ConcurrentDictionary 当 Set 用（TryAdd 原子）。
+    private static readonly ConcurrentDictionary<string, byte> Pending =
+        new ConcurrentDictionary<string, byte>(StringComparer.Ordinal);
 
     private static TranslationDispatcher _dispatcher;
-    private static Thread _worker;
     private static bool _running;
     private static readonly object EngineLock = new object();
 
@@ -151,7 +149,7 @@ public static class AutoTranslatorEngine
                 continue; // 凭据不完整则跳过
             }
 
-            // 按 cred.PlatformId 匹配引擎类的 PlatformNameKey（去前缀），自动实例化，无写死 switch。
+            // 按 cred.PlatformId 匹配引擎类的 PlatformNameKey，自动实例化，无写死 switch。
             TranslatePlatform source = CreatePlatform(cred.PlatformId, cred.AccessKey, cred.SecretKey);
             if (source != null)
             {
@@ -163,10 +161,11 @@ public static class AutoTranslatorEngine
     }
 
     /// <summary>
-    /// 启动自动翻译引擎并注入翻译源。应在主线程初始化阶段调用一次
+    /// 启用自动翻译引擎并注入翻译源。应在主线程初始化阶段调用一次
     /// （如 <see cref="AutoTranslatorStartup"/> 在总开关 + 实时翻译均开启时触发）。
-    /// 启动条件（总开关 / 实时翻译）由调用方判断，本方法只负责构建翻译源 + 启动后台消费线程。
-    /// 引擎启动不依赖"是否配置了平台凭据"：未配凭据时也启动（dispatcher 带空源集合，
+    /// 启用条件（总开关 / 实时翻译）由调用方判断，本方法只负责构建翻译源并置为就绪。
+    /// 不再创建常驻线程：翻译任务在 <see cref="RequestTranslate"/> 时按需用 Task.Run 触发，跑完即退。
+    /// 引擎启用不依赖"是否配置了平台凭据"：未配凭据时也就绪（dispatcher 带空源集合，
     /// 翻译请求会因 _sources.Count==0 安全返回失败原文，不会崩溃）。
     /// 玩家运行期在设置页补填凭据后由 <see cref="RefreshSources"/> 即时生效，无需重启游戏。
     /// </summary>
@@ -179,15 +178,14 @@ public static class AutoTranslatorEngine
                 return;
             }
 
-            List<TranslatePlatform> sources = BuildSources();
-            StartEngine(sources);
+            ApplySources(BuildSources(), "自动翻译引擎已启用");
         }
     }
 
     /// <summary>
     /// 运行期刷新翻译源（玩家在设置页补填 / 修改凭据并保存时调用）。
-    /// 重新从当前设置构建 dispatcher 并替换引擎持有的引用；若引擎此前因总开关/实时翻译关闭而未启动，
-    /// 则在此一并启动；若总开关或实时翻译已关闭，则停止引擎。
+    /// 重新从当前设置构建 dispatcher 并替换引擎持有的引用；若引擎此前因总开关/实时翻译关闭而未启用，
+    /// 则在此一并启用；若总开关或实时翻译已关闭，则停用引擎。
     /// 这样首次启动未填凭据的玩家，在设置页填完密钥保存后即可即时生效，无需重启游戏。
     /// </summary>
     public static void RefreshSources()
@@ -200,26 +198,13 @@ public static class AutoTranslatorEngine
                 return;
             }
 
-            List<TranslatePlatform> sources = BuildSources();
-            _dispatcher = new TranslationDispatcher(sources);
-            if (!_running)
-            {
-                StartWorker();
-            }
-
-            if (sources.Count == 0)
-            {
-                Logger.Warning("未配置任何翻译平台凭据，自动翻译引擎已启动但翻译不会生效（需在设置页配置凭据）。");
-            }
-            else
-            {
-                Logger.Message(string.Format("翻译源已刷新，已启用 {0} 个翻译平台。", sources.Count));
-            }
+            ApplySources(BuildSources(), "翻译源已刷新");
         }
     }
 
     /// <summary>
-    /// 停止后台消费线程并清空翻译源（总开关关闭 / 实时翻译关闭时调用）。
+    /// 停用引擎并清空翻译源（总开关关闭 / 实时翻译关闭时调用）。
+    /// 无常驻线程需要终止，仅置标志位：在途任务跑完自然结束，新请求会被 _running 挡下。
     /// </summary>
     public static void Stop()
     {
@@ -232,54 +217,33 @@ public static class AutoTranslatorEngine
 
             _running = false;
             _dispatcher = null;
-            Queue.CompleteAdding();
-            Logger.Message("自动翻译引擎已停止。");
+            Logger.Message("自动翻译引擎已停用。");
         }
     }
 
     /// <summary>
-    /// 构建 dispatcher 并启动后台线程（假定 EngineLock 已持有）。首次启动或刷新后补全启动用。
+    /// 应用翻译源并置引擎为就绪（假定 EngineLock 已持有）。首次启用与运行期刷新共用。
     /// </summary>
-    private static void StartEngine(List<TranslatePlatform> sources)
+    private static void ApplySources(List<TranslatePlatform> sources, string logPrefix)
     {
         _dispatcher = new TranslationDispatcher(sources);
-        StartWorker();
+        _boundFolderName = LanguageDatabase.activeLanguage?.folderName;
+        _running = true;
 
         if (sources.Count == 0)
         {
-            Logger.Warning("未配置任何翻译平台凭据，自动翻译引擎已启动但翻译不会生效（需在设置页配置凭据）。");
+            Logger.Warning(logPrefix + "，但未配置任何翻译平台凭据，翻译不会生效（需在设置页配置凭据）。");
         }
         else
         {
-            Logger.Message(string.Format("自动翻译引擎已启动（后台消费线程），已启用 {0} 个翻译平台。", sources.Count));
+            Logger.Message(string.Format("{0}，已启用 {1} 个翻译平台。", logPrefix, sources.Count));
         }
-    }
-
-    /// <summary>
-    /// 启动后台消费线程（假定 EngineLock 已持有且 _dispatcher 已就绪）。
-    /// 旧的 BlockingCollection 若已 CompleteAdding，则重建一个新队列供新线程消费。
-    /// </summary>
-    private static void StartWorker()
-    {
-        _boundFolderName = LanguageDatabase.activeLanguage?.folderName;
-        if (Queue.IsAddingCompleted)
-        {
-            Queue = new BlockingCollection<Job>();
-        }
-
-        _running = true;
-        _worker = new Thread(ConsumeLoop)
-        {
-            IsBackground = true,
-            Name = "AutoTranslator.Worker"
-        };
-        _worker.Start();
     }
 
     /// <summary>
     /// 提交一条翻译请求（实时翻译开启时使用）。立即返回，不阻塞主线程。
     /// 已翻译（命中 cache）或在途（命中 pending）的 key 会被去重，不重复打 API。
-    /// 引擎未启动（未 Configure）时直接忽略。
+    /// 引擎未启用（未 Configure）时直接忽略。
     /// </summary>
     public static void RequestTranslate(string key, string source, string target, string fallback)
     {
@@ -293,20 +257,20 @@ public static class AutoTranslatorEngine
             return; // 已翻译，直接返回，不请求 API
         }
 
-        Enqueue(key, source, target, fallback);
+        Submit(key, source, target, fallback);
     }
 
     /// <summary>
     /// 一键翻译：读取 auto.xml，仅筛选 translated=false 的待翻译条目，
-    /// 批量提交翻译请求（强制覆盖在途去重），翻译成功写 auto.xml（translated=true）。
+    /// 批量提交翻译任务（并发受 <see cref="Throttle"/> 限制），翻译成功写 auto.xml（translated=true）。
     /// 不再依赖"value 是否等于原文"推断，彻底避免引擎返回原文导致的死循环。
-    /// 引擎未启动或无需翻译时直接返回。
+    /// 引擎未启用或无需翻译时直接返回。
     /// </summary>
     public static void TranslateAllPending()
     {
         if (!_running)
         {
-            Logger.Warning("自动翻译引擎未启动，无法执行一键翻译。");
+            Logger.Warning("自动翻译引擎未启用，无法执行一键翻译。");
             return;
         }
 
@@ -319,46 +283,28 @@ public static class AutoTranslatorEngine
 
         Dictionary<string, AutoXmlWriter.AutoKeyEntry> autoKeys = AutoXmlWriter.LoadAutoKeys();
         int submitted = 0;
-        foreach (var kv in autoKeys)
+        foreach (KeyValuePair<string, AutoXmlWriter.AutoKeyEntry> kv in autoKeys)
         {
-            string key = kv.Key;
-            AutoXmlWriter.AutoKeyEntry entry = kv.Value;
-
             // 仅提交未翻译（translated=false）的条目，已翻译的跳过。
-            if (entry.Translated)
+            if (kv.Value.Translated)
             {
                 continue;
             }
 
-            string fallback = entry.Value ?? string.Empty;
+            string key = kv.Key;
+            string fallback = kv.Value.Value ?? string.Empty;
             if (string.IsNullOrEmpty(fallback))
             {
-                // 兜底：记录值为空时用 key 本身作为原文。
+                // 兜底：记录值为空时取默认语言原文，仍为空则用 key 本身。
                 TaggedString defaultText;
                 LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out defaultText);
                 fallback = defaultText.NullOrEmpty() ? key : defaultText.ToString();
             }
 
-            // 强制入队：绕过在途去重（这些 key 尚未翻译完成）。
-            lock (PendingLock)
+            if (Submit(key, source, target, fallback))
             {
-                Pending.Add(key);
+                submitted++;
             }
-
-            if (Queue.IsAddingCompleted)
-            {
-                Logger.Warning("自动翻译引擎已停止，无法继续提交一键翻译任务。");
-                break;
-            }
-
-            Queue.Add(new Job
-            {
-                Key = key,
-                Source = source,
-                Target = target,
-                Fallback = fallback
-            });
-            submitted++;
         }
 
         if (submitted == 0)
@@ -367,116 +313,119 @@ public static class AutoTranslatorEngine
         }
         else
         {
-            Logger.Message(string.Format("已提交 {0} 个待翻译 key 至一键翻译队列。", submitted));
+            Logger.Message(string.Format("已提交 {0} 个待翻译 key。", submitted));
         }
     }
 
-    private static void Enqueue(string key, string source, string target, string fallback)
+    /// <summary>
+    /// 在途去重后用 Task.Run 触发一次性后台翻译任务。返回是否实际提交。
+    /// 任务内先等信号量（限流），拿到名额才真正打 API；跑完释放名额并移除 pending，任务自然结束。
+    /// </summary>
+    private static bool Submit(string key, string source, string target, string fallback)
     {
-        lock (PendingLock)
+        // TryAdd 原子操作：已在途则返回 false，不重复提交。
+        if (!Pending.TryAdd(key, 0))
         {
-            if (Pending.Contains(key))
-            {
-                return; // 已在途中，不重复提交
-            }
-
-            Pending.Add(key);
+            return false;
         }
 
-        if (Queue.IsAddingCompleted)
-        {
-            return; // 引擎已停止（队列已 CloseAdding），丢弃该请求
-        }
-
-        Queue.Add(new Job
-        {
-            Key = key,
-            Source = source,
-            Target = target,
-            Fallback = fallback
-        });
+        Task.Run(() => RunTranslateTask(key, source, target, fallback));
+        return true;
     }
 
-    private static void ConsumeLoop()
+    /// <summary>
+    /// 单个 key 的后台翻译流程：限流 -> 调 API -> 回写内存（投递主线程） -> 写 auto.xml -> 释放。
+    /// 全程 try/finally 保证信号量与 pending 一定被释放，不会因异常泄漏名额导致引擎卡死。
+    /// </summary>
+    private static void RunTranslateTask(string key, string source, string target, string fallback)
     {
-        foreach (Job job in Queue.GetConsumingEnumerable())
+        bool ok = false;
+        string translated = null;
+
+        try
         {
-            bool ok = false;
-            string translated = null;
-            TranslationDispatcher dispatcher = _dispatcher; // 本地捕获，避免 RefreshSources 替换后并发读
+            Throttle.Wait();
             try
             {
-                if (AutoTranslatorMod.RealtimeUpdateEnabled && dispatcher != null)
+                // 本地捕获，避免 RefreshSources 并发替换引用导致空引用。
+                TranslationDispatcher dispatcher = _dispatcher;
+                if (!_running || dispatcher == null)
                 {
-                    // 实时翻译开启：调 API 翻译 -> 回写内存 -> 写 auto.xml（译文）
-                    TranslationResult result = dispatcher.Translate(job.Source, job.Target, job.Fallback);
-                    if (result.Success && !string.IsNullOrEmpty(result.TranslatedText))
-                    {
-                        ok = true;
-                        translated = result.TranslatedText;
-                        Cache[job.Key] = translated;
-                        WriteToRimWorld(job.Key, translated);
-                    }
+                    return;
+                }
+
+                TranslationResult result = dispatcher.Translate(source, target, fallback);
+                if (result.Success && !string.IsNullOrEmpty(result.TranslatedText))
+                {
+                    ok = true;
+                    translated = result.TranslatedText;
+                    Cache[key] = translated;
+                    WriteToRimWorld(key, translated);
+                }
+            }
+            finally
+            {
+                Throttle.Release();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning("后台翻译任务异常: " + ex.Message);
+        }
+        finally
+        {
+            // auto.xml：成功写译文（translated=true，覆盖），失败写原文（translated=false，不覆盖已有译文）。
+            try
+            {
+                if (ok)
+                {
+                    AutoXmlWriter.WriteAutoKey(key, translated, translated: true, overwrite: true);
                 }
                 else
                 {
-                    // 实时翻译关闭：仅把 key 与默认语言内容写入 auto.xml，不调 API、不回写内存。
-                    AutoXmlWriter.WriteAutoKey(job.Key, job.Fallback, translated: false, overwrite: false);
+                    AutoXmlWriter.WriteAutoKey(key, fallback, translated: false, overwrite: false);
                 }
             }
             catch (Exception ex)
             {
-                Logger.Warning("后台翻译任务异常: " + ex.Message);
+                Logger.Warning("写入 auto.xml 失败: " + ex.Message);
             }
-            finally
-            {
-                if (AutoTranslatorMod.RealtimeUpdateEnabled)
-                {
-                    // auto.xml：成功写译文（translated=true，覆盖），失败写原文（translated=false，不覆盖已有译文）。
-                    if (ok)
-                    {
-                        AutoXmlWriter.WriteAutoKey(job.Key, translated, translated: true, overwrite: true);
-                    }
-                    else
-                    {
-                        AutoXmlWriter.WriteAutoKey(job.Key, job.Fallback, translated: false, overwrite: false);
-                    }
-                }
 
-                lock (PendingLock)
-                {
-                    Pending.Remove(job.Key);
-                }
-            }
+            byte ignored;
+            Pending.TryRemove(key, out ignored);
         }
     }
 
     /// <summary>
     /// 将译文写进 RimWorld 当前激活语言的 keyedReplacements 字典，使其在下一次查询时实时命中。
-    /// 不重载语言包、不动 xml 解析，开销仅一次字典赋值（加锁保护）。
-    /// 若检测到语言已切换（folderName 与绑定值不符），则跳过，避免写错语言对象。
+    /// 不重载语言包、不动 xml 解析，开销仅一次字典赋值。
+    ///
+    /// 线程安全：keyedReplacements 是普通 Dictionary，RimWorld 主线程每帧都在读；
+    /// 后台线程直接写可能在扩容瞬间与读并发导致崩溃。因此通过 LongEventHandler.ExecuteWhenFinished
+    /// 把写操作投递回主线程执行（下一帧生效，与"下一帧才重绘"的时序天然一致），彻底免锁。
+    /// 若届时语言已切换（folderName 与绑定值不符），则跳过，避免写错语言对象。
     /// </summary>
     private static void WriteToRimWorld(string key, string translated)
     {
-        LoadedLanguage lang = LanguageDatabase.activeLanguage;
-        if (lang == null)
+        LongEventHandler.ExecuteWhenFinished(() =>
         {
-            return;
-        }
+            LoadedLanguage lang = LanguageDatabase.activeLanguage;
+            if (lang == null)
+            {
+                return;
+            }
 
-        if (_boundFolderName != null && lang.folderName != _boundFolderName)
-        {
-            return; // 语言已切换，跳过回写
-        }
+            if (_boundFolderName != null && lang.folderName != _boundFolderName)
+            {
+                return; // 语言已切换，跳过回写
+            }
 
-        lock (DictLock)
-        {
             lang.keyedReplacements[key] = new LoadedLanguage.KeyedReplacement
             {
                 key = key,
                 value = translated,
                 isPlaceholder = false
             };
-        }
+        });
     }
 }
