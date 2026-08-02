@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Verse;
 
 namespace nomadicooer.AutoTranslator;
@@ -22,8 +23,8 @@ public static class AutoLog
   {
     get
     {
-      var modRoot = System.IO.Path.Combine(GenFilePaths.ModsFolderPath, AutoTranslatorConstants.ModPackageDir);
-      return System.IO.Path.Combine(modRoot, AutoTranslatorConstants.LogDirName, AutoTranslatorConstants.LogFileName);
+      var modRoot = Path.Combine(GenFilePaths.ModsFolderPath, AutoTranslatorConstants.ModPackageDir);
+      return Path.Combine(modRoot, AutoTranslatorConstants.LogDirName, AutoTranslatorConstants.LogFileName);
     }
   }
 
@@ -33,12 +34,12 @@ public static class AutoLog
     try
     {
       var path = LogFilePath;
-      var dir = System.IO.Path.GetDirectoryName(path);
+      var dir = Path.GetDirectoryName(path);
       if (!string.IsNullOrEmpty(dir))
       {
-        System.IO.Directory.CreateDirectory(dir);
+        Directory.CreateDirectory(dir);
       }
-      System.IO.File.AppendAllText(path, line + System.Environment.NewLine);
+      File.AppendAllText(path, line + Environment.NewLine);
     }
     catch (Exception)
     {
