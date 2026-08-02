@@ -42,13 +42,15 @@ public static class AutoLog
   /// <summary>日志前缀，固定为本模组 ID，便于在 RimWorld 控制台筛选。</summary>
   private static string Prefix => $"[{AutoTranslatorConstants.ModId}] ";
 
-  /// <summary>纯文本日志文件完整路径（存档目录/AutoTranslator/autotranslator.log）。首次写入时惰性计算并建目录。</summary>
+  /// <summary>纯文本日志文件完整路径（mod 包目录/Logs/autotranslator.log）。首次写入时惰性计算并建目录。</summary>
   private static string LogFilePath
   {
     get
     {
-      var saveDir = GenFilePaths.SaveDataFolderPath;
-      return System.IO.Path.Combine(saveDir, AutoTranslatorConstants.LogDirName, AutoTranslatorConstants.LogFileName);
+      // 放到我们自己的 mod 包目录下独立 Logs/ 子目录，不污染 RimWorld 存档根或其他日志。
+      // GenFilePaths.ModsFolderPath 是所有 mod 的根目录，再拼上本 mod 包名（AutoTranslator）子目录。
+      var modRoot = System.IO.Path.Combine(GenFilePaths.ModsFolderPath, AutoTranslatorConstants.ModPackageDir);
+      return System.IO.Path.Combine(modRoot, AutoTranslatorConstants.LogDirName, AutoTranslatorConstants.LogFileName);
     }
   }
 

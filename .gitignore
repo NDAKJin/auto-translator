@@ -5,6 +5,9 @@ Publish/AutoTranslator/1.6/Assemblies/
 data/
 build.log
 
+# AutoLog 纯文本日志文件出口产物（运行时生成，落在 mod 包目录 Logs/ 下）
+Publish/AutoTranslator/Logs/
+
 # 本地符号链接目录（不随仓库提交，需各自机器重建）
 Extends/
 
