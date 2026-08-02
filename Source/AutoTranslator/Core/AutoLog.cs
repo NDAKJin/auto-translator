@@ -16,7 +16,31 @@ public static class AutoLog
   /// <summary>文件出口开关：true 时每条日志同步 append 到 mod 包目录 Logs/。默认 false。</summary>
   public static bool EnabledToFile { get; set; }
 
+  /// <summary>异常摘要开关：true 只输出「类型: 消息」，false 输出完整堆栈。默认 true。</summary>
+  public static bool CompactException { get; set; } = true;
+
   private static string Prefix => $"[{AutoTranslatorGlobals.ModId}] ";
+
+  /// <summary>异常描述：按 CompactException 决定输出摘要或全堆栈。</summary>
+  private static string Describe(Exception ex)
+  {
+    if (ex == null)
+    {
+      return string.Empty;
+    }
+    if (!CompactException)
+    {
+      return ex.ToString();
+    }
+    Exception root = ex;
+    while (root.InnerException != null)
+    {
+      root = root.InnerException;
+    }
+    return root == ex
+      ? $"{ex.GetType().Name}: {ex.Message}"
+      : $"{ex.GetType().Name}: {ex.Message} <- {root.GetType().Name}: {root.Message}";
+  }
 
   /// <summary>日志时间戳（文件出口用）。</summary>
   private static string Now => DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
@@ -88,6 +112,16 @@ public static class AutoLog
     }
   }
 
+  /// <summary>警告级（带异常）：异常按 CompactException 摘要或展开。</summary>
+  public static void Warn(string text, Exception ex)
+  {
+    if (!Enabled)
+    {
+      return;
+    }
+    Warn($"{text} | {Describe(ex)}");
+  }
+
   /// <summary>警告级（单次）：相同文本只输出一次。</summary>
   public static void WarnOnce(string text)
   {
@@ -116,6 +150,16 @@ public static class AutoLog
     {
       AppendToFile($"[{Now}] ERROR {full}");
     }
+  }
+
+  /// <summary>错误级（带异常）：异常按 CompactException 摘要或展开。</summary>
+  public static void Error(string text, Exception ex)
+  {
+    if (!Enabled)
+    {
+      return;
+    }
+    Error($"{text} | {Describe(ex)}");
   }
 
   /// <summary>错误级（单次）：相同文本只输出一次。</summary>
