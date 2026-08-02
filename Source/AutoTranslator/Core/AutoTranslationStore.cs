@@ -137,7 +137,7 @@ public static class AutoTranslationStore
     catch (System.Exception ex)
     {
       // 写盘失败不应影响游戏主流程，仅记录日志。
-      Log.Warning($"[{AutoTranslatorConstants.ModId}] 写入 auto.xml 失败: {path}\n{ex}");
+      AutoLog.Warn($"写入 auto.xml 失败: {path}\n{ex}");
     }
   }
 
