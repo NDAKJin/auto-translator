@@ -27,6 +27,6 @@ public static class AutoTranslatorGlobals
   /// <summary>纯文本日志文件名。AutoLog 文件出口的落盘文件名。</summary>
   public const string LogFileName = "autotranslator.log";
 
-  /// <summary>本模组包根目录（mods 根目录/AutoTranslator）。运行时依赖 Unity 环境，用静态属性而非 const。</summary>
-  public static string ModRootDir => Path.Combine(GenFilePaths.ModsFolderPath, ModPackageDir);
+  /// <summary>本模组包根目录（mods 根目录/AutoTranslator）。mod 加载时已就绪，初始化后固定不变。</summary>
+  public static readonly string ModRootDir = Path.Combine(GenFilePaths.ModsFolderPath, ModPackageDir);
 }
