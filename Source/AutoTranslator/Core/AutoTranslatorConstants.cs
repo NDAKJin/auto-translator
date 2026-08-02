@@ -18,4 +18,10 @@ public static class AutoTranslatorConstants
 
   /// <summary>自动翻译记录文件名。写入当前激活语言包的 Keyed 目录。</summary>
   public const string AutoXmlFileName = "auto.xml";
+
+  /// <summary>纯文本日志子目录名。AutoLog 文件出口将日志写入存档目录下的此子目录。</summary>
+  public const string LogDirName = "AutoTranslator";
+
+  /// <summary>纯文本日志文件名。AutoLog 文件出口的落盘文件名。</summary>
+  public const string LogFileName = "autotranslator.log";
 }
