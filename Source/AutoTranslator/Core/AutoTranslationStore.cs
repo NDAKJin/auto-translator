@@ -34,11 +34,10 @@ public static class AutoTranslationStore
   /// <summary>记录一条翻译（写入口）：去重入内存，达阈值触发落盘。</summary>
   public static void Record(string key, string value)
   {
-    if (!Writable || key == null)
+    if (!Writable || key == null || value == null)
     {
       return;
     }
-    value ??= string.Empty;
     if (store.TryGetValue(key, out string existing) && existing == value)
     {
       return;
