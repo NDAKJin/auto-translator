@@ -14,8 +14,8 @@ namespace nomadicooer.AutoTranslator;
 /// - 分级：Debug / Info / Warn / Error。Debug 级受 <see cref="DebugEnabled"/> 单独控制
 ///   （默认关，发布期关掉避免刷屏）；Warn/Error 始终输出（除非全局关）。
 /// - 每条自动带 ModId 前缀，统一标识来源。
-/// - Warn/Error 默认即「单次」语义：相同文本（按内容 hash 稳定 key）只输出一次，避免反复刷屏。
-///   上游无需手管 key；调用处应避免拼接每次变化的文本（如异常堆栈），否则去重失效。
+/// - Warn/Error 每次均输出（不去重）；去重由显式 Once 系（WarnOnce/ErrorOnce）提供，
+///   调用方按"该条是否会反复刷屏"自行决定，不去重为默认行为（RimWorld 的 Once 去重本就是可选能力）。
 ///
 /// 分层：基础层（被所有层依赖，自身不依赖上层）。
 /// </summary>
@@ -50,8 +50,18 @@ public static class AutoLog
     Verse.Log.Message(Prefix + text);
   }
 
-  /// <summary>警告级（单次语义）：可恢复的非预期情况（如写盘失败）。相同文本只输出一次。</summary>
+  /// <summary>警告级：可恢复的非预期情况（如写盘失败）。每次均输出（不去重）。</summary>
   public static void Warn(string text)
+  {
+    if (!Enabled)
+    {
+      return;
+    }
+    Verse.Log.Warning(Prefix + text);
+  }
+
+  /// <summary>警告级（单次）：相同文本只输出一次，用字符串 hash 作为稳定 key。用于会反复触发的噪声。</summary>
+  public static void WarnOnce(string text)
   {
     if (!Enabled)
     {
@@ -60,8 +70,18 @@ public static class AutoLog
     Verse.Log.WarningOnce(Prefix + text, text.GetHashCode());
   }
 
-  /// <summary>错误级（单次语义）：不可恢复或严重影响功能的问题。相同文本只输出一次。</summary>
+  /// <summary>错误级：不可恢复或严重影响功能的问题。每次均输出（不去重）。</summary>
   public static void Error(string text)
+  {
+    if (!Enabled)
+    {
+      return;
+    }
+    Verse.Log.Error(Prefix + text);
+  }
+
+  /// <summary>错误级（单次）：相同文本只输出一次，用字符串 hash 作为稳定 key。用于会反复触发的噪声。</summary>
+  public static void ErrorOnce(string text)
   {
     if (!Enabled)
     {

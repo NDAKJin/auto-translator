@@ -136,8 +136,8 @@ public static class AutoTranslationStore
     }
     catch (System.Exception ex)
     {
-      // 写盘失败不应影响游戏主流程，仅记录日志（文本稳定，配合 AutoLog 单次语义避免刷屏）。
-      AutoLog.Warn($"写入 auto.xml 失败({ex.GetType().Name}): {path}");
+      // 写盘失败不应影响游戏主流程，仅记录日志（含堆栈便于排查）。
+      AutoLog.Warn($"写入 auto.xml 失败: {path}\n{ex}");
     }
   }
 
