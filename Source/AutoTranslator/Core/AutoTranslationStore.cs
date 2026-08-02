@@ -13,20 +13,15 @@ public static class AutoTranslationStore
   private const float FlushIntervalSeconds = 3f;  // 距上次落盘超此秒数落盘
   private static readonly string XmlRootTag = "LanguageData";
 
-  private static string modRootDir;                // 模组根目录（Init 注入，避免反向依赖 Mod 入口）
-  private static readonly Dictionary<string, string> store = new();
+  private static readonly Dictionary<string, string> store = [];
   private static int dirtyCount;                   // 自上次落盘新增/变更条数
   private static float sinceLastFlush;             // 距上次落盘累计时间
 
-  /// <summary>可写：已注入根目录且当前语言非 English（English 为源语言基准包，跳过）。</summary>
+  /// <summary>可写：当前语言非 English（English 为源语言基准包，跳过）。</summary>
   private static bool Writable
   {
     get
     {
-      if (string.IsNullOrEmpty(modRootDir))
-      {
-        return false;
-      }
       if (LanguageDatabase.activeLanguage == null
           || LanguageDatabase.activeLanguage == LanguageDatabase.defaultLanguage)
       {
@@ -34,12 +29,6 @@ public static class AutoTranslationStore
       }
       return true;
     }
-  }
-
-  /// <summary>注入模组根目录，由启动初始化阶段调用一次，早于任何 Record/Flush。</summary>
-  public static void Init(string modRootDirectory)
-  {
-    modRootDir = modRootDirectory;
   }
 
   /// <summary>记录一条翻译（写入口）：去重入内存，达阈值触发落盘。</summary>
@@ -112,7 +101,7 @@ public static class AutoTranslationStore
       }
       string folder = LanguageDatabase.activeLanguage.folderName;
       return Path.Combine(
-        modRootDir,
+        AutoTranslatorGlobals.ModRootDir,
         "Languages",
         folder,
         "Keyed",
