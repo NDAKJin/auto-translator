@@ -22,6 +22,8 @@ public class AutoTranslatorSettings : ModSettings
         Scribe_Values.Look(ref enableAutoTranslate, "enableAutoTranslate", true);
         Scribe_Values.Look(ref enableTranslationLog, "enableTranslationLog", false);
         Scribe_Values.Look(ref enableRealtimeUpdate, "enableRealtimeUpdate", false);
+        // 设置加载/落盘后，将翻译记录开关同步给底层存储
+        AutoTranslationStore.SetTranslationLogEnabled(enableTranslationLog);
     }
 
     // 缓存语言信息行，按激活语言对象引用失效（语言切换会重建数据，引用必变）
@@ -61,7 +63,12 @@ public class AutoTranslatorSettings : ModSettings
         listingStandard.Label($"{cachedActiveLangLine}    {cachedDefaultLangLine}");
         listingStandard.Gap(6f);
         listingStandard.CheckboxLabeled(TranslateKeys.EnableAutoTranslate.Translate(), ref enableAutoTranslate);
+        bool prevLog = enableTranslationLog;
         listingStandard.CheckboxLabeled(TranslateKeys.EnableTranslationLog.Translate(), ref enableTranslationLog);
+        if (prevLog != enableTranslationLog)
+        {
+          AutoTranslationStore.SetTranslationLogEnabled(enableTranslationLog);
+        }
         listingStandard.CheckboxLabeled(TranslateKeys.EnableRealtimeUpdate.Translate(), ref enableRealtimeUpdate);
         listingStandard.End();
     }

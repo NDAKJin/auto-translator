@@ -51,13 +51,19 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>记录一条翻译（写入口）：两阶段 —— 先存源文(translated=false)，翻译后存译文(translated=true)。
-  /// 同 key 两次调用可能只带部分字段，按 key 合并补全（保留对方阶段已记录的原文/译文）；translated 取 OR（终态 true 不被 false 覆盖）。
-  /// translated 默认 false（源文阶段）；译文为空回退为源文。</summary>
-  public static void Record(string key, string translation, string source, bool translated = false)
+  /// <summary>记录一条翻译（写入口）：两阶段 —— 先存源文(text=原文, translated=false)，翻译后存译文(text=译文, translated=true)。
+  /// 源文/译文分两次调用、每次只传一个 text，按 key 合并：translated=false 填 Source 槽，translated=true 填 Translation 槽；
+  /// 译文为空回退为源文；translated 取 OR（终态 true 不被后到 false 覆盖）。translated 默认 false（源文阶段）。</summary>
+  public static void Record(string key, string text, bool translated = false)
   {
     EnsureTimerStarted();
     if (!Writable || key == null)
+    {
+      return;
+    }
+    // DevMode 下游戏会对未译原文套变音符号作伪本地化回退，此类伪文本仅调试期占位、
+    // 无翻译价值，且只可能出现在 DevMode；跳过记录避免污染 auto.xml 源文。
+    if (Prefs.DevMode)
     {
       return;
     }
@@ -66,34 +72,95 @@ public static class AutoTranslationStore
     lock (lockObj)
     {
       store.TryGetValue(key, out TranslationEntry existing);
-      // 译文优先用本次非空值，否则沿用已有（源文阶段译文回退为源文）
-      string mergedTranslation = translation;
-      if (string.IsNullOrEmpty(mergedTranslation))
+      // 人工已校验/改过的条目受保护：自动 Record 路径不覆盖，保留人工成果
+      if (existing != null && existing.Verified)
       {
-        mergedTranslation = existing?.Translation;
+        return;
       }
-      if (string.IsNullOrEmpty(mergedTranslation))
+      // 源文：本次 text 优先，否则沿用已有，最后回退 key
+      string mergedSource = existing?.Source;
+      if (!translated)
       {
-        mergedTranslation = source;
+        mergedSource = string.IsNullOrEmpty(text) ? (existing?.Source ?? key) : text;
       }
-      // 源文优先用本次非空值，否则沿用已有，最后回退 key
-      string mergedSource = source;
-      if (string.IsNullOrEmpty(mergedSource))
+      // 译文：translated=true 时取本次 text；空则回退为源文
+      string mergedTranslation = existing?.Translation;
+      if (translated)
       {
-        mergedSource = existing?.Source;
+        mergedTranslation = string.IsNullOrEmpty(text) ? mergedSource : text;
       }
-      if (string.IsNullOrEmpty(mergedSource))
+      else if (string.IsNullOrEmpty(mergedTranslation))
       {
-        mergedSource = key;
+        mergedTranslation = mergedSource;
       }
       // translated：本次或已有任一为 true 即 true（终态 true 不被后到的 false 覆盖）
       bool mergedTranslated = translated || (existing?.Translated ?? false);
 
-      TranslationEntry updated = new(mergedSource, mergedTranslation, mergedTranslated);
+      TranslationEntry updated = new(key, mergedSource, mergedTranslation, mergedTranslated);
       if (existing != null && existing.Equals(updated))
       {
         return;
       }
+      store[key] = updated;
+      dirtyCount++;
+      needFlush = dirtyCount >= FlushThreshold;
+    }
+    if (needFlush)
+    {
+      Flush();
+    }
+  }
+
+  /// <summary>用户主动操作入口：在设置界面修改某条译文（人工更改），标记 Verified=true 保护，不被自动 Record 覆盖。</summary>
+  public static void SetTranslation(string key, string translation)
+  {
+    if (key == null)
+    {
+      return;
+    }
+    TryLoad();
+    bool needFlush;
+    lock (lockObj)
+    {
+      store.TryGetValue(key, out TranslationEntry existing);
+      string source = existing?.Source ?? key;
+      TranslationEntry updated = new(key, source, translation, true, verified: true);
+      if (existing != null && existing.Equals(updated))
+      {
+        return;
+      }
+      store[key] = updated;
+      dirtyCount++;
+      needFlush = dirtyCount >= FlushThreshold;
+    }
+    if (needFlush)
+    {
+      Flush();
+    }
+  }
+
+  /// <summary>用户主动操作入口：切换某条校验状态（操作列「校验」按钮可开可关）。
+  /// verified=true 保护不被自动 Record 覆盖；verified=false 恢复自动路径可覆盖。</summary>
+  public static void SetVerified(string key, bool verified)
+  {
+    if (key == null)
+    {
+      return;
+    }
+    TryLoad();
+    bool needFlush;
+    lock (lockObj)
+    {
+      store.TryGetValue(key, out TranslationEntry existing);
+      if (existing == null)
+      {
+        return;
+      }
+      if (existing.Verified == verified)
+      {
+        return;
+      }
+      TranslationEntry updated = new(key, existing.Source, existing.Translation, existing.Translated, verified);
       store[key] = updated;
       dirtyCount++;
       needFlush = dirtyCount >= FlushThreshold;
@@ -208,6 +275,7 @@ public static class AutoTranslationStore
         writer.WriteStartElement(key);
         writer.WriteAttributeString("source", entry.Source);
         writer.WriteAttributeString("translated", entry.Translated ? "true" : "false");
+        writer.WriteAttributeString("verified", entry.Verified ? "true" : "false");
         if (!string.IsNullOrEmpty(entry.Translation))
         {
           writer.WriteString(entry.Translation);
@@ -260,8 +328,15 @@ public static class AutoTranslationStore
             {
               translated = parsed;
             }
+            bool verified = false;
+            string verifiedAttr = el.GetAttribute("verified");
+            if (!string.IsNullOrEmpty(verifiedAttr)
+                && bool.TryParse(verifiedAttr, out bool verifiedParsed))
+            {
+              verified = verifiedParsed;
+            }
             // 旧 auto.xml 无 translated 属性时按 true 兼容；译文取 InnerText（可能为空=仅源文）
-            store[el.Name] = new TranslationEntry(src, el.InnerText, translated);
+            store[el.Name] = new TranslationEntry(el.Name, src, el.InnerText, translated, verified);
           }
         }
       }
