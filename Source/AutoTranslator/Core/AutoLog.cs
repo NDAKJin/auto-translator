@@ -18,6 +18,9 @@ public static class AutoLog
 
   private static string Prefix => $"[{AutoTranslatorGlobals.ModId}] ";
 
+  /// <summary>日志时间戳（文件出口用）。</summary>
+  private static string Now => DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
+
   /// <summary>纯文本日志文件完整路径（mod 包目录/Logs/autotranslator.log）。</summary>
   private static string LogFilePath =>
     Path.Combine(AutoTranslatorGlobals.ModRootDir, AutoTranslatorGlobals.LogDirName, AutoTranslatorGlobals.LogFileName);
@@ -129,6 +132,4 @@ public static class AutoLog
       AppendToFile($"[{Now}] ERROR {full}");
     }
   }
-
-  private static string Now => DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
 }
