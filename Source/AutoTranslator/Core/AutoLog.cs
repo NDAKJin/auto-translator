@@ -19,14 +19,8 @@ public static class AutoLog
   private static string Prefix => $"[{AutoTranslatorConstants.ModId}] ";
 
   /// <summary>纯文本日志文件完整路径（mod 包目录/Logs/autotranslator.log）。</summary>
-  private static string LogFilePath
-  {
-    get
-    {
-      var modRoot = Path.Combine(GenFilePaths.ModsFolderPath, AutoTranslatorConstants.ModPackageDir);
-      return Path.Combine(modRoot, AutoTranslatorConstants.LogDirName, AutoTranslatorConstants.LogFileName);
-    }
-  }
+  private static string LogFilePath =>
+    Path.Combine(AutoTranslatorConstants.ModRootDir, AutoTranslatorConstants.LogDirName, AutoTranslatorConstants.LogFileName);
 
   /// <summary>追加一行到日志文件，失败静默忽略（不影响主流程、不回写日志）。</summary>
   private static void AppendToFile(string line)
