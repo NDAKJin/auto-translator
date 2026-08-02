@@ -12,7 +12,7 @@ public class AutoTranslatorSettings : ModSettings
     // 基本设置：三个开关（持久化到 ModConfigs.xml，不进 git）
     // 开启动态翻译：拦截无 key 文本做动态翻译，有 key 的仍由系统管理
     public bool enableAutoTranslate = true;
-    // 启动翻译记录：记录翻译过程/结果
+    // 启用翻译记录：为无 key 字符串自动创建 key，并拦截有 key 但未翻译的，落盘到当前语言包 auto.xml
     public bool enableTranslationLog;
     // 启用实时翻译：实时翻译
     public bool enableRealtimeUpdate;
