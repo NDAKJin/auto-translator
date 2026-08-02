@@ -1,0 +1,21 @@
+namespace nomadicooer.AutoTranslator;
+
+/// <summary>
+/// 跨文件共享的常量约定。
+/// 仅存放被多个类引用、属于公开约定的常量（如 key 前缀、ModId）。
+/// 单类内部专用的常量（flush 阈值、私有键等）应放在各自类内，不要放进这里。
+/// </summary>
+public static class AutoTranslatorConstants
+{
+  /// <summary>自动翻译 key 前缀。无 key 字符串自动建 key 时统一加此前缀，落盘到 auto.xml。</summary>
+  public const string AutoKeyPrefix = "auto.";
+
+  /// <summary>翻译 key 前缀。系统既有 key 的统一前缀（区别于 auto. 自动 key）。</summary>
+  public const string TranslationKeyPrefix = "";
+
+  /// <summary>本模组 ID。用于 Harmony 补丁 owner、日志标识等。</summary>
+  public const string ModId = "nomadicooer.AutoTranslator";
+
+  /// <summary>自动翻译记录文件名。写入当前激活语言包的 Keyed 目录。</summary>
+  public const string AutoXmlFileName = "auto.xml";
+}
