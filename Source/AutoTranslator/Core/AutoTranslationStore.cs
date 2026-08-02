@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using RimWorld;
+using System.Threading;
+using System.Xml;
 using Verse;
 
 namespace nomadicooer.AutoTranslator;
@@ -9,19 +11,37 @@ namespace nomadicooer.AutoTranslator;
 /// <summary>自动翻译数据唯一存储：内存字典为状态源，缓冲落盘到当前语言包 auto.xml。</summary>
 public static class AutoTranslationStore
 {
-  private const int FlushThreshold = 50;          // 累积条数达此值落盘
-  private const float FlushIntervalSeconds = 3f;  // 距上次落盘超此秒数落盘
+  private const int FlushThreshold = 50;                // 累积条数达此值落盘
+  private const int FlushIntervalMilliseconds = 3000;   // 距上次落盘超此时长落盘
   private static readonly string XmlRootTag = "LanguageData";
 
   private static readonly Dictionary<string, string> store = [];
-  private static int dirtyCount;                   // 自上次落盘新增/变更条数
-  private static float sinceLastFlush;             // 距上次落盘累计时间
+  private static int dirtyCount;                        // 自上次落盘新增/变更条数
 
-  /// <summary>可写：当前语言非 English（English 为源语言基准包，跳过）。</summary>
+  private static readonly object lockObj = new();       // 保护 store / dirtyCount
+  private static readonly object startLock = new();     // 保护定时器懒启动
+  private static volatile bool timerStarted;            // 定时器是否已启动（懒启动标志）
+  private static Timer flushTimer;                      // 后台线程池定时器，非主线程
+  private static bool loaded;                           // 是否已从磁盘加载历史（一次性）
+
+  // 翻译记录开关：由设置页通过 SetTranslationLogEnabled 注入，不反向依赖上层设置类
+  private static bool enabledTranslationLog;
+
+  /// <summary>注入翻译记录开关（设置项 enableTranslationLog 的镜像）。</summary>
+  public static void SetTranslationLogEnabled(bool enabled)
+  {
+    enabledTranslationLog = enabled;
+  }
+
+  /// <summary>可写：开关开启且当前语言非 English（English 为源语言基准包，跳过）。</summary>
   private static bool Writable
   {
     get
     {
+      if (!enabledTranslationLog)
+      {
+        return false;
+      }
       if (LanguageDatabase.activeLanguage == null
           || LanguageDatabase.activeLanguage == LanguageDatabase.defaultLanguage)
       {
@@ -34,31 +54,50 @@ public static class AutoTranslationStore
   /// <summary>记录一条翻译（写入口）：去重入内存，达阈值触发落盘。</summary>
   public static void Record(string key, string value)
   {
+    EnsureTimerStarted();
     if (!Writable || key == null || string.IsNullOrEmpty(value))
     {
       return;
     }
-    if (store.TryGetValue(key, out string existing) && existing == value)
+    TryLoad();
+    bool needFlush;
+    lock (lockObj)
     {
-      return;
+      if (store.TryGetValue(key, out string existing) && existing == value)
+      {
+        return;
+      }
+      store[key] = value;
+      dirtyCount++;
+      needFlush = dirtyCount >= FlushThreshold;
     }
-    store[key] = value;
-    dirtyCount++;
-    if (dirtyCount >= FlushThreshold)
+    if (needFlush)
     {
       Flush();
     }
   }
 
-  /// <summary>每帧由主循环调用，驱动定时落盘；无 dirty 不计数不写盘。</summary>
-  public static void Update()
+  /// <summary>懒启动后台定时器：首次 Record 调用时初始化，仅一次（双检锁）。</summary>
+  private static void EnsureTimerStarted()
   {
-    if (!Writable || dirtyCount == 0)
+    if (timerStarted)
     {
       return;
     }
-    sinceLastFlush += RealTime.deltaTime;
-    if (sinceLastFlush >= FlushIntervalSeconds)
+    lock (startLock)
+    {
+      if (!timerStarted)
+      {
+        flushTimer = new Timer(_ => FlushIfDirty(), null, FlushIntervalMilliseconds, FlushIntervalMilliseconds);
+        timerStarted = true;
+      }
+    }
+  }
+
+  /// <summary>定时器回调：有 dirty 才落盘，避免无写入时写空盘。</summary>
+  private static void FlushIfDirty()
+  {
+    if (dirtyCount > 0)
     {
       Flush();
     }
@@ -76,14 +115,19 @@ public static class AutoTranslationStore
     {
       return;
     }
+    // 短锁拷快照后立即释放锁，再由主线程外的定时器线程写盘，避免锁住共享状态
+    Dictionary<string, string> snapshot;
+    lock (lockObj)
+    {
+      snapshot = new Dictionary<string, string>(store);
+      dirtyCount = 0;
+    }
     try
     {
       Directory.CreateDirectory(Path.GetDirectoryName(path));
-      File.WriteAllText(path, Serialize(), Encoding.UTF8);
-      dirtyCount = 0;
-      sinceLastFlush = 0f;
+      File.WriteAllText(path, Serialize(snapshot), Encoding.UTF8);
     }
-    catch (System.Exception ex)
+    catch (Exception ex)
     {
       AutoLog.Warn($"写入 auto.xml 失败: {path}", ex);
     }
@@ -108,41 +152,75 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>序列化为 RimWorld Keyed 格式 xml，键按字母序稳定输出。</summary>
-  private static string Serialize()
+  /// <summary>序列化为 RimWorld Keyed 格式 xml，键按字母序稳定输出；经 XmlWriter 自动处理转义。</summary>
+  private static string Serialize(Dictionary<string, string> data)
   {
-    StringBuilder sb = new();
-    sb.Append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");
-    sb.Append('<').Append(XmlRootTag).Append(">\n");
-    List<string> keys = new(store.Keys);
+    List<string> keys = [.. data.Keys];
     keys.Sort();
-    foreach (string key in keys)
+    XmlWriterSettings settings = new()
     {
-      sb.Append("  <")
-        .Append(XmlEncode(key))
-        .Append('>')
-        .Append(XmlEncode(store[key]))
-        .Append("</")
-        .Append(XmlEncode(key))
-        .Append(">\n");
+      Encoding = Encoding.UTF8,
+      Indent = true,
+      IndentChars = "  ",
+      OmitXmlDeclaration = false,
+    };
+    StringBuilder sb = new();
+    using (XmlWriter writer = XmlWriter.Create(sb, settings))
+    {
+      writer.WriteStartDocument();
+      writer.WriteStartElement(XmlRootTag);
+      foreach (string key in keys)
+      {
+        // 跳过无法作为合法元素名的 key（如含空格/冒号），避免 XmlWriter 抛异常
+        if (string.IsNullOrEmpty(key) || !XmlReader.IsName(key))
+        {
+          AutoLog.Warn($"跳过非法翻译 key（不可作 xml 元素名）: {key}");
+          continue;
+        }
+        writer.WriteElementString(key, data[key]);
+      }
+      writer.WriteEndElement();
+      writer.WriteEndDocument();
     }
-    sb.Append("</").Append(XmlRootTag).Append('>');
     return sb.ToString();
   }
 
-  /// <summary>转义 xml 特殊字符（& < > "）。</summary>
-  private static string XmlEncode(string s)
+  /// <summary>首次可写时从当前语言包 auto.xml 加载历史翻译到内存；仅填 store，不触 dirtyCount 以免落盘覆盖。</summary>
+  private static void TryLoad()
   {
-    if (s == null)
+    if (loaded)
     {
-      return string.Empty;
+      return;
     }
-    return s.Replace("&", "&amp;")
-            .Replace("<", "&lt;")
-            .Replace(">", "&gt;")
-            .Replace("\"", "&quot;");
+    loaded = true;
+    string path = AutoXmlFilePath;
+    if (path == null || !File.Exists(path))
+    {
+      return;
+    }
+    try
+    {
+      XmlDocument doc = new();
+      doc.Load(path);
+      XmlElement root = doc.DocumentElement;
+      if (root == null || root.Name != XmlRootTag)
+      {
+        return;
+      }
+      lock (lockObj)
+      {
+        foreach (XmlNode node in root.ChildNodes)
+        {
+          if (node is XmlElement el && !string.IsNullOrEmpty(el.Name))
+          {
+            store[el.Name] = el.InnerText;
+          }
+        }
+      }
+    }
+    catch (Exception ex)
+    {
+      AutoLog.Warn($"加载 auto.xml 失败: {path}", ex);
+    }
   }
-
-  // 读功能占位（本阶段不实现）
-  // public static void Load() { }
 }
