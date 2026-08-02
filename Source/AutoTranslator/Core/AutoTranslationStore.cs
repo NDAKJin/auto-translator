@@ -52,8 +52,8 @@ public static class AutoTranslationStore
   }
 
   /// <summary>记录一条翻译（写入口）：两阶段 —— 先存源文(translated=false)，翻译后存译文(translated=true)。
-  /// 译文为空表示仅有源文阶段；去重按 key+源文+译文+是否翻译 整体比较。</summary>
-  public static void Record(string key, string translation, string source, bool translated)
+  /// translated 默认 false（源文阶段）；译文为空回退为源文。去重按 key+源文+译文+是否翻译 整体比较。</summary>
+  public static void Record(string key, string translation, string source, bool translated = false)
   {
     EnsureTimerStarted();
     if (!Writable || key == null)
