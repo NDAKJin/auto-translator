@@ -2,6 +2,7 @@
 <LanguageData>
   <!-- 存放软件自身翻译key -->
   <AutoTranslator.SettingsCategory>自动翻译</AutoTranslator.SettingsCategory>
+  <AutoTranslator.BasicInfo>基本信息</AutoTranslator.BasicInfo>
   <AutoTranslator.ActiveLanguage>当前语言：{0}</AutoTranslator.ActiveLanguage>
   <AutoTranslator.DefaultLanguage>默认语言：{0}</AutoTranslator.DefaultLanguage>
   <AutoTranslator.EnableAutoTranslate>启用自动翻译</AutoTranslator.EnableAutoTranslate>

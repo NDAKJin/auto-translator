@@ -1,6 +1,4 @@
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 [assembly: AssemblyTitle("AutoTranslator")]
 [assembly: AssemblyDescription("RimWorld 自动翻译模组")]
