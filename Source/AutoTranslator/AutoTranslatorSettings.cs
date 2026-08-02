@@ -14,7 +14,7 @@ public class AutoTranslatorSettings : ModSettings
     public bool enableAutoTranslate = true;
     // 启用翻译记录：为无 key 字符串自动创建 key，并拦截有 key 但未翻译的，落盘到当前语言包 auto.xml
     public bool enableTranslationLog;
-    // 启用实时翻译：实时翻译
+    // 启用实时翻译：翻译完成后实时回写到界面/文本
     public bool enableRealtimeUpdate;
 
     public override void ExposeData()
