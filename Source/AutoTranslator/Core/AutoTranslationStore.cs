@@ -52,7 +52,8 @@ public static class AutoTranslationStore
   }
 
   /// <summary>记录一条翻译（写入口）：两阶段 —— 先存源文(translated=false)，翻译后存译文(translated=true)。
-  /// translated 默认 false（源文阶段）；译文为空回退为源文。去重按 key+源文+译文+是否翻译 整体比较。</summary>
+  /// 同 key 两次调用可能只带部分字段，按 key 合并补全（保留对方阶段已记录的原文/译文）；translated 取 OR（终态 true 不被 false 覆盖）。
+  /// translated 默认 false（源文阶段）；译文为空回退为源文。</summary>
   public static void Record(string key, string translation, string source, bool translated = false)
   {
     EnsureTimerStarted();
@@ -60,27 +61,40 @@ public static class AutoTranslationStore
     {
       return;
     }
-    // 译文缺省回退为源文（翻译失败时落盘仍是原文，translated=false）
-    if (string.IsNullOrEmpty(translation))
-    {
-      translation = source;
-    }
-    if (string.IsNullOrEmpty(source))
-    {
-      source = key;
-    }
     TryLoad();
     bool needFlush;
     lock (lockObj)
     {
-      if (store.TryGetValue(key, out TranslationEntry existing)
-          && existing.Source == source
-          && existing.Translation == translation
-          && existing.Translated == translated)
+      store.TryGetValue(key, out TranslationEntry existing);
+      // 译文优先用本次非空值，否则沿用已有（源文阶段译文回退为源文）
+      string mergedTranslation = translation;
+      if (string.IsNullOrEmpty(mergedTranslation))
+      {
+        mergedTranslation = existing?.Translation;
+      }
+      if (string.IsNullOrEmpty(mergedTranslation))
+      {
+        mergedTranslation = source;
+      }
+      // 源文优先用本次非空值，否则沿用已有，最后回退 key
+      string mergedSource = source;
+      if (string.IsNullOrEmpty(mergedSource))
+      {
+        mergedSource = existing?.Source;
+      }
+      if (string.IsNullOrEmpty(mergedSource))
+      {
+        mergedSource = key;
+      }
+      // translated：本次或已有任一为 true 即 true（终态 true 不被后到的 false 覆盖）
+      bool mergedTranslated = translated || (existing?.Translated ?? false);
+
+      TranslationEntry updated = new(mergedSource, mergedTranslation, mergedTranslated);
+      if (existing != null && existing.Equals(updated))
       {
         return;
       }
-      store[key] = new TranslationEntry(source, translation, translated);
+      store[key] = updated;
       dirtyCount++;
       needFlush = dirtyCount >= FlushThreshold;
     }
