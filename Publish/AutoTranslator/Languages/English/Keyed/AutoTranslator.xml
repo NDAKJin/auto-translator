@@ -5,9 +5,9 @@
   <AutoTranslator.BasicInfo>Basic Info</AutoTranslator.BasicInfo>
   <AutoTranslator.ActiveLanguage>Active language: {0}</AutoTranslator.ActiveLanguage>
   <AutoTranslator.DefaultLanguage>Default language: {0}</AutoTranslator.DefaultLanguage>
-  <AutoTranslator.EnableAutoTranslate>Enable auto translation</AutoTranslator.EnableAutoTranslate>
+  <AutoTranslator.EnableAutoTranslate>Enable dynamic translation</AutoTranslator.EnableAutoTranslate>
+  <AutoTranslator.EnableTranslationLog>Enable translation log</AutoTranslator.EnableTranslationLog>
   <AutoTranslator.EnableRealtimeUpdate>Enable realtime translation</AutoTranslator.EnableRealtimeUpdate>
-  <AutoTranslator.TranslateAll>Translate all pending</AutoTranslator.TranslateAll>
   <AutoTranslator.VolcengineAccessKey>Volcengine AccessKey</AutoTranslator.VolcengineAccessKey>
   <AutoTranslator.VolcengineSecretKey>Volcengine SecretKey</AutoTranslator.VolcengineSecretKey>
   <AutoTranslator.AliyunAccessKeyId>Aliyun AccessKeyId</AutoTranslator.AliyunAccessKeyId>

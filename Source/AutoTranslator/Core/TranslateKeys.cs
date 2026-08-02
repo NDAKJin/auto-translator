@@ -12,8 +12,8 @@ public static class TranslateKeys
   public const string ActiveLanguage = "AutoTranslator.ActiveLanguage";
   public const string DefaultLanguage = "AutoTranslator.DefaultLanguage";
   public const string EnableAutoTranslate = "AutoTranslator.EnableAutoTranslate";
+  public const string EnableTranslationLog = "AutoTranslator.EnableTranslationLog";
   public const string EnableRealtimeUpdate = "AutoTranslator.EnableRealtimeUpdate";
-  public const string TranslateAll = "AutoTranslator.TranslateAll";
   public const string VolcengineAccessKey = "AutoTranslator.VolcengineAccessKey";
   public const string VolcengineSecretKey = "AutoTranslator.VolcengineSecretKey";
   public const string AliyunAccessKeyId = "AutoTranslator.AliyunAccessKeyId";

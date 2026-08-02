@@ -5,7 +5,7 @@
 ___
 当前语言:ChineseSimplified(简体中文)&emsp;&emsp;&emsp;语言:English   
 开启动态翻译            <checkbox>√</checkbox>   
-启动翻译记录            <checkbox>√</checkbox>  
+启用翻译记录            <checkbox>√</checkbox>  
 启用实时翻译            <checkbox>√</checkbox>
 ### 平台设置
 ___
