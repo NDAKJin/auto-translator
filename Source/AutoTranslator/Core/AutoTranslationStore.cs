@@ -19,7 +19,7 @@ namespace nomadicooer.AutoTranslator;
 /// 路径：写入 Languages/&lt;当前激活语言 folderName&gt;/Keyed/auto.xml。
 /// English 作为源语言基准包，不写 auto.xml（AutoXmlFilePath 在 English 下返回 null 跳过）。
 ///
-/// 分层：位于核心层，依赖 AutoTranslatorConstants（基础层），被引擎/补丁层单向依赖，不反向引用上层。
+/// 分层：位于核心层，依赖 AutoTranslatorGlobals（基础层），被引擎/补丁层单向依赖，不反向引用上层。
 /// </summary>
 public static class AutoTranslationStore
 {
@@ -156,7 +156,7 @@ public static class AutoTranslationStore
         "Languages",
         folder,
         "Keyed",
-        AutoTranslatorConstants.AutoXmlFileName);
+        AutoTranslatorGlobals.AutoXmlFileName);
     }
   }
 

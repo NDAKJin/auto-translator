@@ -3,12 +3,8 @@ using Verse;
 
 namespace nomadicooer.AutoTranslator;
 
-/// <summary>
-/// 跨文件共享的常量约定。
-/// 仅存放被多个类引用、属于公开约定的常量（如 key 前缀、ModId）。
-/// 单类内部专用的常量（flush 阈值、私有键等）应放在各自类内，不要放进这里。
-/// </summary>
-public static class AutoTranslatorConstants
+/// <summary>跨文件共享的全局定义：常量与枚举等，初始化后固定不变。</summary>
+public static class AutoTranslatorGlobals
 {
   /// <summary>自动翻译 key 前缀。无 key 字符串自动建 key 时统一加此前缀，落盘到 auto.xml。</summary>
   public const string AutoKeyPrefix = "auto.";

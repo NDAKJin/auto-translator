@@ -16,11 +16,11 @@ public static class AutoLog
   /// <summary>文件出口开关：true 时每条日志同步 append 到 mod 包目录 Logs/。默认 false。</summary>
   public static bool EnabledToFile { get; set; }
 
-  private static string Prefix => $"[{AutoTranslatorConstants.ModId}] ";
+  private static string Prefix => $"[{AutoTranslatorGlobals.ModId}] ";
 
   /// <summary>纯文本日志文件完整路径（mod 包目录/Logs/autotranslator.log）。</summary>
   private static string LogFilePath =>
-    Path.Combine(AutoTranslatorConstants.ModRootDir, AutoTranslatorConstants.LogDirName, AutoTranslatorConstants.LogFileName);
+    Path.Combine(AutoTranslatorGlobals.ModRootDir, AutoTranslatorGlobals.LogDirName, AutoTranslatorGlobals.LogFileName);
 
   /// <summary>追加一行到日志文件，失败静默忽略（不影响主流程、不回写日志）。</summary>
   private static void AppendToFile(string line)
