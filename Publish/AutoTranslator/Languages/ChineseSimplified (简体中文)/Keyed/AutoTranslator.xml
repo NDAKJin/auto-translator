@@ -6,7 +6,7 @@
   <AutoTranslator.ActiveLanguage>当前语言：{0}</AutoTranslator.ActiveLanguage>
   <AutoTranslator.DefaultLanguage>默认语言：{0}</AutoTranslator.DefaultLanguage>
   <AutoTranslator.EnableAutoTranslate>开启动态翻译</AutoTranslator.EnableAutoTranslate>
-  <AutoTranslator.EnableTranslationLog>启动翻译记录</AutoTranslator.EnableTranslationLog>
+  <AutoTranslator.EnableTranslationLog>启用翻译记录</AutoTranslator.EnableTranslationLog>
   <AutoTranslator.EnableRealtimeUpdate>启用实时翻译</AutoTranslator.EnableRealtimeUpdate>
   <AutoTranslator.VolcengineAccessKey>火山引擎 AccessKey</AutoTranslator.VolcengineAccessKey>
   <AutoTranslator.VolcengineSecretKey>火山引擎 SecretKey</AutoTranslator.VolcengineSecretKey>
