@@ -15,7 +15,7 @@ public static class AutoTranslationStore
   private const int FlushIntervalMilliseconds = 3000;   // 距上次落盘超此时长落盘
   private static readonly string XmlRootTag = "LanguageData";
 
-  private static readonly Dictionary<string, string> store = [];
+  private static readonly Dictionary<string, TranslationEntry> store = [];
   private static int dirtyCount;                        // 自上次落盘新增/变更条数
 
   private static readonly object lockObj = new();       // 保护 store / dirtyCount
@@ -51,23 +51,36 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>记录一条翻译（写入口）：去重入内存，达阈值触发落盘。</summary>
-  public static void Record(string key, string value)
+  /// <summary>记录一条翻译（写入口）：两阶段 —— 先存源文(translated=false)，翻译后存译文(translated=true)。
+  /// 译文为空表示仅有源文阶段；去重按 key+源文+译文+是否翻译 整体比较。</summary>
+  public static void Record(string key, string translation, string source, bool translated)
   {
     EnsureTimerStarted();
-    if (!Writable || key == null || string.IsNullOrEmpty(value))
+    if (!Writable || key == null)
     {
       return;
+    }
+    // 译文缺省回退为源文（翻译失败时落盘仍是原文，translated=false）
+    if (string.IsNullOrEmpty(translation))
+    {
+      translation = source;
+    }
+    if (string.IsNullOrEmpty(source))
+    {
+      source = key;
     }
     TryLoad();
     bool needFlush;
     lock (lockObj)
     {
-      if (store.TryGetValue(key, out string existing) && existing == value)
+      if (store.TryGetValue(key, out TranslationEntry existing)
+          && existing.Source == source
+          && existing.Translation == translation
+          && existing.Translated == translated)
       {
         return;
       }
-      store[key] = value;
+      store[key] = new TranslationEntry(source, translation, translated);
       dirtyCount++;
       needFlush = dirtyCount >= FlushThreshold;
     }
@@ -116,10 +129,10 @@ public static class AutoTranslationStore
       return;
     }
     // 短锁拷快照后立即释放锁，再由主线程外的定时器线程写盘，避免锁住共享状态
-    Dictionary<string, string> snapshot;
+    Dictionary<string, TranslationEntry> snapshot;
     lock (lockObj)
     {
-      snapshot = new Dictionary<string, string>(store);
+      snapshot = new Dictionary<string, TranslationEntry>(store);
       dirtyCount = 0;
     }
     try
@@ -153,7 +166,7 @@ public static class AutoTranslationStore
   }
 
   /// <summary>序列化为 RimWorld Keyed 格式 xml，键按字母序稳定输出；经 XmlWriter 自动处理转义。</summary>
-  private static string Serialize(Dictionary<string, string> data)
+  private static string Serialize(Dictionary<string, TranslationEntry> data)
   {
     List<string> keys = [.. data.Keys];
     keys.Sort();
@@ -177,7 +190,15 @@ public static class AutoTranslationStore
           AutoLog.Warn($"跳过非法翻译 key（不可作 xml 元素名）: {key}");
           continue;
         }
-        writer.WriteElementString(key, data[key]);
+        TranslationEntry entry = data[key];
+        writer.WriteStartElement(key);
+        writer.WriteAttributeString("source", entry.Source);
+        writer.WriteAttributeString("translated", entry.Translated ? "true" : "false");
+        if (!string.IsNullOrEmpty(entry.Translation))
+        {
+          writer.WriteString(entry.Translation);
+        }
+        writer.WriteEndElement();
       }
       writer.WriteEndElement();
       writer.WriteEndDocument();
@@ -213,7 +234,20 @@ public static class AutoTranslationStore
         {
           if (node is XmlElement el && !string.IsNullOrEmpty(el.Name))
           {
-            store[el.Name] = el.InnerText;
+            string src = el.GetAttribute("source");
+            if (string.IsNullOrEmpty(src))
+            {
+              src = el.Name;
+            }
+            bool translated = true;
+            string translatedAttr = el.GetAttribute("translated");
+            if (!string.IsNullOrEmpty(translatedAttr)
+                && bool.TryParse(translatedAttr, out bool parsed))
+            {
+              translated = parsed;
+            }
+            // 旧 auto.xml 无 translated 属性时按 true 兼容；译文取 InnerText（可能为空=仅源文）
+            store[el.Name] = new TranslationEntry(src, el.InnerText, translated);
           }
         }
       }
