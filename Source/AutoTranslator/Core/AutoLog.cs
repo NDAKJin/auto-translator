@@ -37,7 +37,7 @@ public static class AutoLog
     {
       return;
     }
-    Verse.Log.Message(Prefix + text);
+    Log.Message(Prefix + text);
   }
 
   /// <summary>信息级：常规流程提示。</summary>
@@ -47,7 +47,7 @@ public static class AutoLog
     {
       return;
     }
-    Verse.Log.Message(Prefix + text);
+    Log.Message(Prefix + text);
   }
 
   /// <summary>警告级：可恢复的非预期情况（如写盘失败）。每次均输出（不去重）。</summary>
@@ -57,7 +57,7 @@ public static class AutoLog
     {
       return;
     }
-    Verse.Log.Warning(Prefix + text);
+    Log.Warning(Prefix + text);
   }
 
   /// <summary>警告级（单次）：相同文本只输出一次，用字符串 hash 作为稳定 key。用于会反复触发的噪声。</summary>
@@ -67,7 +67,7 @@ public static class AutoLog
     {
       return;
     }
-    Verse.Log.WarningOnce(Prefix + text, text.GetHashCode());
+    Log.WarningOnce(Prefix + text, text.GetHashCode());
   }
 
   /// <summary>错误级：不可恢复或严重影响功能的问题。每次均输出（不去重）。</summary>
@@ -77,7 +77,7 @@ public static class AutoLog
     {
       return;
     }
-    Verse.Log.Error(Prefix + text);
+    Log.Error(Prefix + text);
   }
 
   /// <summary>错误级（单次）：相同文本只输出一次，用字符串 hash 作为稳定 key。用于会反复触发的噪声。</summary>
@@ -87,6 +87,6 @@ public static class AutoLog
     {
       return;
     }
-    Verse.Log.ErrorOnce(Prefix + text, text.GetHashCode());
+    Log.ErrorOnce(Prefix + text, text.GetHashCode());
   }
 }
