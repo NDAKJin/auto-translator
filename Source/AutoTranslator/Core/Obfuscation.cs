@@ -46,23 +46,4 @@ public static class Obfuscation
             return encoded;
         }
     }
-
-    /// <summary>显示打码：留首尾各 2 位，中间以 **** 代替；过短则全 *。仅用于设置页展示。</summary>
-    public static string Mask(string plain, int visibleEachSide = 2)
-    {
-        if (string.IsNullOrEmpty(plain))
-        {
-            return plain;
-        }
-        if (plain.Length <= visibleEachSide * 2)
-        {
-            return new string('*', plain.Length);
-        }
-        return plain.Substring(0, visibleEachSide)
-            + "****"
-            + plain.Substring(plain.Length - visibleEachSide);
-    }
-
-    /// <summary>判断字符串是否仍为打码形态（含 ****），用于设置页区分"用户已编辑"。</summary>
-    public static bool IsMasked(string text) => !string.IsNullOrEmpty(text) && text.Contains("****");
 }

@@ -37,21 +37,6 @@ public class AutoTranslatorMod : Mod
     /// <summary>设置页滚动视图的纵向位移状态（跨帧保留）。</summary>
     private Vector2 settingsScrollPos;
 
-    /// <summary>凭据输入框打码缓冲：key=平台id+"_ak"/"_sk"，value=当前显示串（初始为打码形态）。</summary>
-    private readonly Dictionary<string, string> credMaskBuffer = new Dictionary<string, string>();
-
-    /// <summary>取打码缓冲：首次用真实 key 的打码串初始化；之后复用已编辑内容。</summary>
-    private string GetMaskBuffer(string credId, string suffix, string realValue)
-    {
-        string key = credId + suffix;
-        if (!credMaskBuffer.TryGetValue(key, out string buf))
-        {
-            buf = Obfuscation.Mask(realValue);
-            credMaskBuffer[key] = buf;
-        }
-        return buf;
-    }
-
     public override void DoSettingsWindowContents(Rect inRect)
     {
         const float ScrollBarMargin = 16f;
@@ -115,39 +100,13 @@ public class AutoTranslatorMod : Mod
                         : cred.PlatformId;
                     listing.Label(platformLabel);
 
-                    // 访问键：默认显示打码串；用户编辑后（非打码形态）才写回真实 key。
-                    string akBuf = GetMaskBuffer(cred.PlatformId, "_ak", cred.AccessKey);
-                    string akEdited = listing.TextEntryLabeled(
-                        platformLabel + " · " + TranslateKeys.AccessKey.Translate(), akBuf);
-                    if (akEdited != akBuf)
-                    {
-                        if (Obfuscation.IsMasked(akEdited))
-                        {
-                            credMaskBuffer[cred.PlatformId + "_ak"] = akEdited; // 仅在原打码上微调，不写回真实 key
-                        }
-                        else
-                        {
-                            cred.AccessKey = akEdited; // 用户清空重填了真实值
-                            credMaskBuffer[cred.PlatformId + "_ak"] = Obfuscation.Mask(akEdited);
-                        }
-                    }
+                    // 访问键：真实值存 cred.AccessKey（label 字段，隐藏），输入框用密码框打码，改后同步写回。
+                    cred.AccessKey = DrawPasswordField(
+                        listing, platformLabel + " · " + TranslateKeys.AccessKey.Translate(), cred.AccessKey);
 
                     // 密钥：同上
-                    string skBuf = GetMaskBuffer(cred.PlatformId, "_sk", cred.SecretKey);
-                    string skEdited = listing.TextEntryLabeled(
-                        platformLabel + " · " + TranslateKeys.SecretKey.Translate(), skBuf);
-                    if (skEdited != skBuf)
-                    {
-                        if (Obfuscation.IsMasked(skEdited))
-                        {
-                            credMaskBuffer[cred.PlatformId + "_sk"] = skEdited;
-                        }
-                        else
-                        {
-                            cred.SecretKey = skEdited;
-                            credMaskBuffer[cred.PlatformId + "_sk"] = Obfuscation.Mask(skEdited);
-                        }
-                    }
+                    cred.SecretKey = DrawPasswordField(
+                        listing, platformLabel + " · " + TranslateKeys.SecretKey.Translate(), cred.SecretKey);
                 }
             }
 
@@ -211,5 +170,18 @@ public class AutoTranslatorMod : Mod
             Text.Font = previous;
         }
         listing.Gap(4f);
+    }
+
+    /// <summary>
+    /// 密码框封装（仿 TextEntryLabeled）：左半 label + 右半 GUI.PasswordField。
+    /// 真实值存于 realValue（调用方持有的 label 字段，隐藏）；输入框全 * 打码，用户改动后返回真实输入同步写回。
+    /// </summary>
+    private string DrawPasswordField(Listing_Standard listing, string label, string realValue)
+    {
+        Rect rect = listing.GetRect(Text.LineHeight);
+        Rect labelRect = rect.LeftHalf().Rounded();
+        Rect fieldRect = rect.RightHalf().Rounded();
+        Widgets.Label(labelRect, label);
+        return GUI.PasswordField(fieldRect, realValue, '*');
     }
 }
