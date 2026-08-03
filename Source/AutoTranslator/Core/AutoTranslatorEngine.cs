@@ -7,10 +7,10 @@ using Verse;
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>
-/// 自动翻译引擎：统一管理翻译源（启用的平台凭据）、按需异步翻译（Task.Run，不阻塞主线程），
+/// 自动翻译引擎：统一管理翻译源（启用的平台凭据）、按需翻译，
 /// 把官方未翻译的 key 提交翻译并回写到 keyedReplacements / auto.xml。
 /// 落盘统一走 AutoTranslationStore，日志统一走 AutoLog。
-/// 不常驻线程：主线程拦截到漏译时提交一条异步任务，由线程池后台执行翻译并回写。
+/// 翻译在后台线程池（Task.Run）执行，不阻塞 UI；后台异常不吞，统一抛回主线程输出完整堆栈。
 /// </summary>
 public static class AutoTranslatorEngine
 {
@@ -60,23 +60,16 @@ public static class AutoTranslatorEngine
         System.Type type, string accessKey, string secretKey, out TranslatePlatform platform)
     {
         platform = null;
-        try
+        var obj = System.Activator.CreateInstance(type, accessKey ?? string.Empty, secretKey ?? string.Empty);
+        if (obj is TranslatePlatform p)
         {
-            var obj = System.Activator.CreateInstance(type, accessKey ?? string.Empty, secretKey ?? string.Empty);
-            if (obj is TranslatePlatform p)
-            {
-                platform = p;
-                return true;
-            }
-        }
-        catch (System.Exception ex)
-        {
-            AutoLog.Warn($"构造平台 {type.Name} 失败: {ex.Message}");
+            platform = p;
+            return true;
         }
         return false;
     }
 
-    /// <summary>执行单条翻译：调派发器翻译，成功回写 keyedReplacements + 落盘 Store；失败记录原文占位。在线程池后台执行。</summary>
+    /// <summary>执行单条翻译：调派发器翻译，成功回写 keyedReplacements + 落盘 Store；失败记日志。运行在线程池后台线程。</summary>
     private static void Translate(string key, string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -90,15 +83,13 @@ public static class AutoTranslatorEngine
             return;
         }
 
-        string sourceCode = dispatcher.GetSourceLangCode(LanguageDatabase.defaultLanguage.folderName);
-        string targetCode = dispatcher.GetTargetLangCode(LanguageDatabase.activeLanguage.folderName);
-        if (string.IsNullOrEmpty(sourceCode) || string.IsNullOrEmpty(targetCode))
-        {
-            AutoLog.Warn($"语言码映射失败（source={sourceCode}, target={targetCode}），跳过 {key}");
-            return;
-        }
-
-        TranslationResult result = dispatcher.Translate(sourceCode, targetCode, text);
+        // 直接传 RimWorld 语言名（folderName），语言码映射交由底层 TranslatePlatform.GetLangCode 统一处理，
+        // 不要在此预先转成平台码：dispatcher.Translate 内部及模板方法期望收到的是 RimWorld 名，
+        // 二次转换会导致平台码被当 RimWorld 名查表失败、TranslateCore 永不执行。
+        TranslationResult result = dispatcher.Translate(
+            LanguageDatabase.defaultLanguage.folderName,
+            LanguageDatabase.activeLanguage.folderName,
+            text);
         if (result.Success && !string.IsNullOrEmpty(result.TranslatedText))
         {
             string translated = SanitizeResult(text, result.TranslatedText);
@@ -117,23 +108,16 @@ public static class AutoTranslatorEngine
     {
         LongEventHandler.ExecuteWhenFinished(() =>
         {
-            try
+            LoadedLanguage active = LanguageDatabase.activeLanguage;
+            if (active == null || active.keyedReplacements == null)
             {
-                LoadedLanguage active = LanguageDatabase.activeLanguage;
-                if (active == null || active.keyedReplacements == null)
-                {
-                    return;
-                }
-                active.keyedReplacements[key] = new LoadedLanguage.KeyedReplacement
-                {
-                    key = key,
-                    value = translated,
-                };
+                return;
             }
-            catch (System.Exception ex)
+            active.keyedReplacements[key] = new LoadedLanguage.KeyedReplacement
             {
-                AutoLog.Warn($"回写 keyedReplacements 失败 [{key}]", ex);
-            }
+                key = key,
+                value = translated,
+            };
         });
     }
 
@@ -155,6 +139,36 @@ public static class AutoTranslatorEngine
         return translated;
     }
 
+    /// <summary>
+    /// 后台执行一段翻译工作：异常不吞，捕获后原样转交主线程输出完整堆栈（含内部异常），
+    /// 保证 UI 不被 HTTP 阻塞、同时后台错误依然可见。
+    /// </summary>
+    private static void RunInBackground(string context, Action work)
+    {
+        Task.Run(() =>
+        {
+            try
+            {
+                work();
+            }
+            catch (Exception ex)
+            {
+                ReportToMainThread(context, ex);
+            }
+        });
+    }
+
+    /// <summary>把后台线程捕获的异常投递到主线程，用 RimWorld 日志输出完整堆栈。</summary>
+    private static void ReportToMainThread(string context, Exception ex)
+    {
+        Exception captured = ex;
+        string capturedContext = context;
+        LongEventHandler.ExecuteWhenFinished(() =>
+        {
+            AutoLog.Error($"后台翻译异常 [{capturedContext}]：{captured}");
+        });
+    }
+
     /// <summary>提交一条翻译请求（主线程拦截时调用）。后台 Task.Run 执行，不阻塞主线程。</summary>
     public static void RequestTranslate(string key, string text)
     {
@@ -169,7 +183,7 @@ public static class AutoTranslatorEngine
 
         string capturedKey = key;
         string capturedText = text;
-        Task.Run(() => Translate(capturedKey, capturedText));
+        RunInBackground(capturedKey, () => Translate(capturedKey, capturedText));
     }
 
     /// <summary>一键翻译：把当前未翻译的已记录条目批量提交翻译（后台异步执行，不阻塞主线程）。</summary>
@@ -177,11 +191,11 @@ public static class AutoTranslatorEngine
     {
         if (!configured || Dispatcher == null || Dispatcher.Count == 0)
         {
-            AutoLog.Warn("翻译源未就绪，无法一键翻译（请先在设置页启用平台并填入凭据）");
+            AutoLog.Info("翻译源未就绪，无法一键翻译（请先在设置页启用平台并填入凭据）");
             return;
         }
 
-        Task.Run(() =>
+        RunInBackground("TranslateAllPending", () =>
         {
             foreach ((string key, string source) in AutoTranslationStore.LoadUnTranslated())
             {
