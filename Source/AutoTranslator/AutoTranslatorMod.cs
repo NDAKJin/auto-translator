@@ -114,17 +114,22 @@ public class AutoTranslatorMod : Mod
                 }
             }
 
-            // 保存设置 / 恢复默认：两个按钮并排同一行，右侧加眼睛切换密码显示。
+            // 保存设置 / 恢复默认：两个按钮居中并排，右侧加眼睛切换密码显示。
             // 保存设置：明确写盘并刷新引擎（明确保存后才持久化）。
             // 恢复默认：立即重置内存，但需点保存才落盘。
             listing.Gap(12f);
             const float BottomButtonHeight = 28f;
             const float EyeButtonSize = 28f;
             const float EyeSpacing = 4f;
+            const float CenterButtonWidth = 140f;
             Rect bottomRow = listing.GetRect(BottomButtonHeight);
-            float pairWidth = (bottomRow.width - EyeButtonSize - EyeSpacing) / 2f;
-            Rect saveRect = new Rect(bottomRow.x, bottomRow.y, pairWidth, bottomRow.height).Rounded();
-            Rect resetRect = new Rect(bottomRow.x + pairWidth + EyeSpacing, bottomRow.y, pairWidth, bottomRow.height).Rounded();
+            // 眼睛贴右；两个按钮在去掉眼睛后的剩余空间内居中。
+            float availableWidth = bottomRow.width - EyeButtonSize - EyeSpacing;
+            float btnW = Mathf.Min(CenterButtonWidth, (availableWidth - EyeSpacing) / 2f);
+            float centerGroupW = btnW * 2f + EyeSpacing;
+            float centerX = bottomRow.x + (availableWidth - centerGroupW) / 2f;
+            Rect saveRect = new Rect(centerX, bottomRow.y, btnW, bottomRow.height).Rounded();
+            Rect resetRect = new Rect(centerX + btnW + EyeSpacing, bottomRow.y, btnW, bottomRow.height).Rounded();
             Rect eyeRect = new Rect(bottomRow.xMax - EyeButtonSize, bottomRow.y, EyeButtonSize, bottomRow.height).Rounded();
             if (Widgets.ButtonText(saveRect, TranslateKeys.SaveSettings.Translate()))
             {
@@ -191,18 +196,20 @@ public class AutoTranslatorMod : Mod
     }
 
     /// <summary>
-    /// 密码框封装（仿 TextEntryLabeled）：左半 label + 右半输入框。
+    /// 密码框封装（仿 TextEntryLabeled）：label 紧凑靠左 + 输入框填充剩余空间延伸到行尾。
     /// 真实值存于 realValue（调用方持有的 label 字段，隐藏）；输入框全 * 打码或明文显示，用户改动后返回真实输入同步写回。
     /// </summary>
     private string DrawPasswordField(Listing_Standard listing, string label, string realValue, bool showPassword)
     {
         Rect rect = listing.GetRect(Text.LineHeight);
-        Rect labelRect = rect.LeftHalf().Rounded();
-        Rect fieldRect = rect.RightHalf().Rounded();
         GameFont oldFont = Text.Font;
         TextAnchor oldAnchor = Text.Anchor;
         Text.Font = GameFont.Small;
         Text.Anchor = TextAnchor.MiddleLeft;
+        // label 紧凑宽度（按文本计算，最多占半行），输入框从 label 右侧一直延伸到行尾。
+        float labelWidth = Mathf.Min(Text.CalcSize(label).x + 8f, rect.width * 0.5f);
+        Rect labelRect = new Rect(rect.x, rect.y, labelWidth, rect.height).Rounded();
+        Rect fieldRect = new Rect(rect.x + labelWidth, rect.y, rect.width - labelWidth, rect.height).Rounded();
         try
         {
             Widgets.Label(labelRect, label);
