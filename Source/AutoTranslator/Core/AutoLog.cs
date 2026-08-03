@@ -76,10 +76,29 @@ public static class AutoLog
 #endif
   }
 
-  /// <summary>统一出口：RIMWORLD 下走 Verse.Log，否则降级 Debug.WriteLine。</summary>
+  // 主线程 ID：由 AutoLog 首次在主线程被调用时（启动初始化阶段）记录。
+  private static int mainThreadId = -1;
+
+  /// <summary>由启动初始化在主线程调用，登记主线程 ID，供后台线程日志降级判定。</summary>
+  public static void MarkMainThread()
+  {
+    mainThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+  }
+
+  /// <summary>当前是否运行在主线程。未登记时保守视为主线程。</summary>
+  private static bool OnMainThread =>
+    mainThreadId < 0 || System.Threading.Thread.CurrentThread.ManagedThreadId == mainThreadId;
+
+  /// <summary>统一出口：RIMWORLD 下走 Verse.Log，否则降级 Debug.WriteLine。
+  /// 非主线程时绝不调用 Verse.Log（其内部加锁且非线程安全，后台并发调用会拖垮甚至死锁主线程），
+  /// 此时仅由调用方落文件。</summary>
   private static void Emit(string level, string full, bool once)
   {
 #if RIMWORLD
+    if (!OnMainThread)
+    {
+      return;
+    }
     if (level == "Warn")
     {
       if (once) Verse.Log.WarningOnce(full, full.GetHashCode());

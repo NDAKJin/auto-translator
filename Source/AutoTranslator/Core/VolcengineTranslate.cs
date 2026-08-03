@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
 using System.Linq;
-using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -35,6 +34,15 @@ public class VolcengineTranslate : TranslatePlatform
     private const string ContentType = "application/json";
     private const string Algorithm = "HMAC-SHA256";
     private const string SignedHeaders = "content-type;host;x-content-sha256;x-date";
+
+    /// <summary>单次请求超时（毫秒）：与阿里云/百度一致，避免网络不通时长时间阻塞翻译线程。</summary>
+    private const int TimeoutMilliseconds = 6000;
+
+    // 共享 HttpClient：HttpClient 设计为长生命周期复用，每次请求 new 会耗尽 socket 端口。
+    private static readonly HttpClient SharedClient = new()
+    {
+        Timeout = TimeSpan.FromMilliseconds(TimeoutMilliseconds),
+    };
 
     /// <summary>
     /// 构造一个火山翻译平台实例。
@@ -106,35 +114,27 @@ public class VolcengineTranslate : TranslatePlatform
                          + JsonEscape(to)
                          + "\",\"TextList\":[\"" + JsonEscape(text) + "\"]}";
 
-        try
+        string response = SendRequest(payload);
+
+        // 火山错误信息位于 ResponseMetadata.Error.Code（数值码，如 -429；或字符串码如 Throttling）
+        string platformCode = ExtractField(response, "Code");
+        if (!string.IsNullOrEmpty(platformCode) && platformCode != "0" && platformCode != "200")
         {
-            string response = SendRequest(payload);
-
-            // 火山错误信息位于 ResponseMetadata.Error.Code（数值码，如 -429；或字符串码如 Throttling）
-            string platformCode = ExtractField(response, "Code");
-            if (!string.IsNullOrEmpty(platformCode) && platformCode != "0" && platformCode != "200")
-            {
-                TranslationErrorCode code = MapVolcErrorCode(platformCode);
-                string err = "火山翻译错误 " + platformCode + ": " + DescribeError(ErrorMessages, platformCode)
-                              + "（" + ExtractField(response, "Message") + "）";
-                AutoLog.Warn("[AutoTranslator] " + err);
-                return TranslationResult.Fail(text, code, err);
-            }
-
-            string translated = ExtractTranslation(response);
-            if (string.IsNullOrEmpty(translated))
-            {
-                AutoLog.Warn("[AutoTranslator] 火山翻译响应中未找到译文");
-                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译响应中未找到译文");
-            }
-
-            return TranslationResult.Ok(translated);
+            TranslationErrorCode code = MapVolcErrorCode(platformCode);
+            string err = "火山翻译错误 " + platformCode + ": " + DescribeError(ErrorMessages, platformCode)
+                          + "（" + ExtractField(response, "Message") + "）";
+            AutoLog.Warn("[AutoTranslator] " + err);
+            return TranslationResult.Fail(text, code, err);
         }
-        catch (Exception ex)
+
+        string translated = ExtractTranslation(response);
+        if (string.IsNullOrEmpty(translated))
         {
-            AutoLog.Warn("[AutoTranslator] 火山翻译请求失败: " + ex.Message);
-            return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译请求失败: " + ex.Message);
+            AutoLog.Warn("[AutoTranslator] 火山翻译响应中未找到译文");
+            return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译响应中未找到译文");
         }
+
+        return TranslationResult.Ok(translated);
     }
 
     /// <summary>
@@ -217,41 +217,18 @@ public class VolcengineTranslate : TranslatePlatform
                                + ", Signature=" + signature;
 
         var url = new Uri(Schema + "://" + Host + ApiPath + "?" + query);
-        var request = (HttpWebRequest)WebRequest.Create(url);
-        request.Method = "POST";
-        request.ContentType = ContentType;
-        request.Headers["Host"] = Host;
-        request.Headers["X-Date"] = xDate;
-        request.Headers["X-Content-Sha256"] = payloadHash;
-        request.Headers["Authorization"] = authorization;
-
-        using (var stream = request.GetRequestStream())
+        var request = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            stream.Write(body, 0, body.Length);
-        }
+            Content = new ByteArrayContent(body),
+        };
+        request.Content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(ContentType);
+        request.Headers.Host = Host;
+        request.Headers.Add("X-Date", xDate);
+        request.Headers.Add("X-Content-Sha256", payloadHash);
+        request.Headers.TryAddWithoutValidation("Authorization", authorization);
 
-        try
-        {
-            using (var resp = (HttpWebResponse)request.GetResponse())
-            using (var reader = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
-            {
-                return reader.ReadToEnd();
-            }
-        }
-        catch (WebException ex) when (ex.Response is HttpWebResponse errorResp)
-        {
-            // 4xx/5xx 时火山仍会在响应体中返回 ResponseMetadata.Error（含业务错误码），需读出以便上层鉴别
-            using (var reader = new StreamReader(errorResp.GetResponseStream(), Encoding.UTF8))
-            {
-                string errorBody = reader.ReadToEnd();
-                if (!string.IsNullOrEmpty(errorBody))
-                {
-                    return errorBody;
-                }
-            }
-
-            throw;
-        }
+        HttpResponseMessage resp = SharedClient.SendAsync(request).GetAwaiter().GetResult();
+        return resp.Content.ReadAsStringAsync().GetAwaiter().GetResult();
     }
 
     private static string ExtractTranslation(string json)

@@ -1,3 +1,4 @@
+using System;
 using HarmonyLib;
 using Verse;
 
@@ -14,20 +15,36 @@ namespace nomadicooer.AutoTranslator;
 internal static class TranslationPatch
 {
     /// <summary>拦截官方 TryTranslate：查本模组是否已翻译，已译则回写译文直接返回；否则记录并提交实时翻译。</summary>
-    private static void Postfix(string key)
+    private static void Postfix(string key, ref TaggedString result, bool __result)
     {
-        // 总开关关闭则不拦截。
-        if (!AutoTranslatorMod.AutoTranslateEnabled)
+        // 开发模式（DevMode）下整条自动翻译链路不介入：不记录、不实时翻译、也不回写历史译文，
+        // 表现等同「未安装本模组翻译」。原因：① 开发机不应写真实翻译产物到 auto.xml；
+        // ② DevMode 下各种边界（伪翻译、重复重试等）逻辑纠缠，整链路跳过最清晰、最省心，
+        // 避免开发环境误刷翻译接口。
+        if (Prefs.DevMode)
         {
             return;
         }
-        // key 为空无意义，直接跳过。
-        if (key == null)
+        // 总开关关闭则不拦截。
+        if (!AutoTranslatorMod.AutoTranslateEnabled 
+        || String.IsNullOrWhiteSpace(key) 
+        || String.IsNullOrWhiteSpace(result.RawText))
+        {
+            return;
+        }
+        // 激活语言即默认语言（English）时无需翻译/记录，整条链路跳过（提前到最前，省掉多余查询）。
+        if (LanguageDatabase.activeLanguage == null
+            || LanguageDatabase.activeLanguage == LanguageDatabase.defaultLanguage)
+        {
+            return;
+        }
+        // 该条目已经被其它地方翻译，不需要重复翻译
+        if (__result && !AutoTranslationStore.HasSource(key))
         {
             return;
         }
         // 查我们是否已翻译：已翻译则回写已存译文让界面生效并直接返回，不重复记录/提交。
-        // 不再以官方返回值（__result）作为是否接手的判断依据。
+        // 不依赖官方返回值 __result（已补齐参数但不作为接手依据）。
         if (AutoTranslationStore.IsTranslated(key)
             && AutoTranslationStore.TryGetTranslation(key, out string cached)
             && !cached.NullOrEmpty())
@@ -41,12 +58,6 @@ internal static class TranslationPatch
                     value = cached,
                 };
             }
-            return;
-        }
-        // 老版逻辑：激活语言就是默认语言（English）时无需翻译/记录。
-        if (LanguageDatabase.activeLanguage == null
-            || LanguageDatabase.activeLanguage == LanguageDatabase.defaultLanguage)
-        {
             return;
         }
 

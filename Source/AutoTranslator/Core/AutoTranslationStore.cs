@@ -66,7 +66,7 @@ public static class AutoTranslationStore
     {
       return;
     }
-    if (!Writable || Prefs.DevMode)
+    if (!Writable)
     {
       return;
     }
@@ -116,7 +116,7 @@ public static class AutoTranslationStore
     {
       return;
     }
-    if (!Writable || Prefs.DevMode)
+    if (!Writable)
     {
       return;
     }
@@ -172,7 +172,7 @@ public static class AutoTranslationStore
     {
       return;
     }
-    if (!Writable || Prefs.DevMode)
+    if (!Writable)
     {
       return;
     }
@@ -210,7 +210,7 @@ public static class AutoTranslationStore
     {
       return;
     }
-    if (!Writable || Prefs.DevMode)
+    if (!Writable)
     {
       return;
     }
@@ -281,15 +281,8 @@ public static class AutoTranslationStore
         return;
       }
       exitHookRegistered = true;
-      try
-      {
-        Application.quitting += FlushOnExit;
-        AppDomain.CurrentDomain.ProcessExit += (_, _) => FlushOnExit();
-      }
-      catch (Exception ex)
-      {
-        AutoLog.Warn("注册退出落盘钩子失败", ex);
-      }
+      Application.quitting += FlushOnExit;
+      AppDomain.CurrentDomain.ProcessExit += (_, _) => FlushOnExit();
     }
   }
 
@@ -297,16 +290,9 @@ public static class AutoTranslationStore
   /// 异常吞掉，避免在退出流程里抛出打断游戏关闭。</summary>
   private static void FlushOnExit()
   {
-    try
-    {
-      var t = Interlocked.Exchange(ref pendingFlushTimer, null);
-      t?.Dispose();
-      Flush();
-    }
-    catch (Exception ex)
-    {
-      AutoLog.Warn("退出落盘失败", ex);
-    }
+    var t = Interlocked.Exchange(ref pendingFlushTimer, null);
+    t?.Dispose();
+    Flush();
   }
 
   /// <summary>强制落盘：全量序列化写出 auto.xml；无写条件或无可写内容时返回。
@@ -316,31 +302,24 @@ public static class AutoTranslationStore
   {
     lock (flushLock)
     {
-      try
+      if (!Writable || dirtyCount == 0)
       {
-        if (!Writable || dirtyCount == 0)
-        {
-          return;
-        }
-        string path = AutoXmlFilePath;
-        if (path == null)
-        {
-          return;
-        }
-        // 短锁拷快照后立即释放锁，再由主线程外的定时器线程写盘，避免锁住共享状态
-        Dictionary<string, TranslationEntry> snapshot;
-        lock (lockObj)
-        {
-          snapshot = new Dictionary<string, TranslationEntry>(store);
-          dirtyCount = 0;
-        }
-        Directory.CreateDirectory(Path.GetDirectoryName(path));
-        File.WriteAllText(path, Serialize(snapshot), Encoding.UTF8);
+        return;
       }
-      catch (Exception ex)
+      string path = AutoXmlFilePath;
+      if (path == null)
       {
-        AutoLog.Warn("写入 auto.xml 失败", ex);
+        return;
       }
+      // 短锁拷快照后立即释放锁，再由主线程外的定时器线程写盘，避免锁住共享状态
+      Dictionary<string, TranslationEntry> snapshot;
+      lock (lockObj)
+      {
+        snapshot = new Dictionary<string, TranslationEntry>(store);
+        dirtyCount = 0;
+      }
+      Directory.CreateDirectory(Path.GetDirectoryName(path));
+      File.WriteAllText(path, Serialize(snapshot), Encoding.UTF8);
     }
   }
 
@@ -479,59 +458,70 @@ public static class AutoTranslationStore
     {
       return;
     }
-    loaded = true;
     string path = LoadXmlFilePath;
-    if (path == null || !File.Exists(path))
+    // 路径无效（activeLanguage 尚未就绪/为 English）时不标记 loaded、不打日志：
+    // 允许 activeLanguage 就绪后下次查询重试加载，避免启动过早预热导致永久空字典。
+    if (path == null)
     {
       return;
     }
-    try
+    // 诊断：仅当语言已就绪、真正要探测加载时才打印路径与是否存在。
+    AutoLog.Info($"[AutoTranslationStore] TryLoad 路径={path} 存在={File.Exists(path)} activeLang={(LanguageDatabase.activeLanguage?.folderName ?? "null")}");
+    // 路径有效但文件不存在：语言已就绪、只是尚无历史译文。标记 loaded 停止重复查询刷屏，
+    // 真正首次译文落盘后会通过 RecordTranslation 直接写入 store，无需再依赖 TryLoad。
+    if (!File.Exists(path))
     {
-      XmlDocument doc = new();
-      doc.Load(path);
-      XmlElement root = doc.DocumentElement;
-      if (root == null || root.Name != XmlRootTag)
-      {
-        return;
-      }
-      lock (lockObj)
-      {
-        foreach (XmlNode node in root.ChildNodes)
+      loaded = true;
+      return;
+    }
+        loaded = true;
+        // 用 StreamReader 探测真实字节编码（UTF-8），忽略 XML 声明里可能错误的 encoding
+        // （历史文件曾声明 utf-16 实为 UTF-8，XmlDocument.Load 直接读会抛
+        // "There is no Unicode byte order mark" 导致整文件加载失败、store 恒空）。
+        XmlReaderSettings rs = new() { XmlResolver = null, DtdProcessing = DtdProcessing.Ignore };
+        using StreamReader sr = new(path, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        using XmlReader reader = XmlReader.Create(sr, rs);
+        XmlDocument doc = new();
+        doc.Load(reader);
+        XmlElement root = doc.DocumentElement;
+        if (root == null || root.Name != XmlRootTag)
         {
-          if (node is XmlElement el && !string.IsNullOrEmpty(el.Name))
+          return;
+        }
+        lock (lockObj)
+        {
+          foreach (XmlNode node in root.ChildNodes)
           {
-            // 原文缺失（旧文件无 source 或为空）的条目不载入：原文不得用 key 顶替
-            string src = el.GetAttribute("source");
-            if (string.IsNullOrEmpty(src))
+            if (node is XmlElement el && !string.IsNullOrEmpty(el.Name))
             {
-              AutoLog.Warn($"跳过无原文条目（source 为空）: {el.Name}");
-              continue;
+              // 原文缺失（旧文件无 source 或为空）的条目不载入：原文不得用 key 顶替
+              string src = el.GetAttribute("source");
+              if (string.IsNullOrEmpty(src))
+              {
+                AutoLog.Info($"跳过无原文条目（source 为空）: {el.Name}");
+                continue;
+              }
+              bool translated = true;
+              string translatedAttr = el.GetAttribute("translated");
+              if (!string.IsNullOrEmpty(translatedAttr)
+                  && bool.TryParse(translatedAttr, out bool parsed))
+              {
+                translated = parsed;
+              }
+              bool verified = false;
+              string verifiedAttr = el.GetAttribute("verified");
+              if (!string.IsNullOrEmpty(verifiedAttr)
+                  && bool.TryParse(verifiedAttr, out bool verifiedParsed))
+              {
+                verified = verifiedParsed;
+              }
+              // 旧 auto.xml 无 translated 属性时按 true 兼容；译文取 InnerText（可能为空=仅源文）
+              store[el.Name] = new TranslationEntry(el.Name, src, el.InnerText, translated, verified);
             }
-            bool translated = true;
-            string translatedAttr = el.GetAttribute("translated");
-            if (!string.IsNullOrEmpty(translatedAttr)
-                && bool.TryParse(translatedAttr, out bool parsed))
-            {
-              translated = parsed;
-            }
-            bool verified = false;
-            string verifiedAttr = el.GetAttribute("verified");
-            if (!string.IsNullOrEmpty(verifiedAttr)
-                && bool.TryParse(verifiedAttr, out bool verifiedParsed))
-            {
-              verified = verifiedParsed;
-            }
-            // 旧 auto.xml 无 translated 属性时按 true 兼容；译文取 InnerText（可能为空=仅源文）
-            store[el.Name] = new TranslationEntry(el.Name, src, el.InnerText, translated, verified);
           }
+          AutoLog.Info($"[AutoTranslationStore] TryLoad 完成，载入 {store.Count} 条（来自 {path}）");
         }
       }
-    }
-    catch (Exception ex)
-    {
-      AutoLog.Warn($"加载 auto.xml 失败: {path}", ex);
-    }
-  }
 
   /// <summary>惰性加载入口：读路径（HasSource/IsTranslated/TryGetTranslation）与写路径共用，
   /// 也可在启动阶段显式调用预热。旧实现只在写入口触发 TryLoad，导致启动阶段只读查询

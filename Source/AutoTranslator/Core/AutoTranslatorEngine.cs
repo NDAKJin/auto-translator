@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Threading;
 using RimWorld;
 using Verse;
 
@@ -26,6 +26,28 @@ public static class AutoTranslatorEngine
 
     // 正在后台翻译中的 key（去重用）：Postfix 每帧重入同一 key，任务未回来前不重复提交请求。
     private static readonly ConcurrentDictionary<string, byte> inFlight = new();
+
+    /// <summary>队列积压上限：超出则丢弃新请求，避免打开大界面时无限堆积。</summary>
+    private const int MaxQueueLength = 200;
+
+    /// <summary>一条待执行的后台翻译任务。</summary>
+    private sealed class WorkItem
+    {
+        public WorkItem(string context, Action work)
+        {
+            Context = context;
+            Work = work;
+        }
+
+        public string Context { get; }
+
+        public Action Work { get; }
+    }
+
+    // 翻译任务队列 + 专属单工作线程：串行执行，绝不占用 Mono 线程池。
+    private static readonly BlockingCollection<WorkItem> workQueue = new();
+    private static readonly object workerLock = new();
+    private static volatile bool workerStarted;
 
     /// <summary>构建或重建翻译源：把设置里已启用的平台凭据注入对应平台实例并注册到派发器。</summary>
     private static void BuildSources()
@@ -144,33 +166,70 @@ public static class AutoTranslatorEngine
     }
 
     /// <summary>
-    /// 后台执行一段翻译工作：异常不吞，捕获后原样转交主线程输出完整堆栈（含内部异常），
-    /// 保证 UI 不被 HTTP 阻塞、同时后台错误依然可见。
-    /// 同时登记后台任务提交/完成计数，便于检查「翻译完了是否还有后台任务在跑」。
+    /// 后台执行一段翻译工作：投递到专属单工作线程的队列，串行执行。
+    /// 绝不使用线程池（Task.Run）：翻译是同步阻塞 HTTP，一个界面可能瞬间冒出几十个 key，
+    /// 每 key 一个线程池任务会占满 Mono 线程池，导致游戏自身拿不到工作线程而整体卡死。
+    /// 异常不吞，捕获后转交主线程输出完整堆栈。
     /// </summary>
     private static void RunInBackground(string context, Action work)
     {
+        if (workQueue.Count >= MaxQueueLength)
+        {
+            // 队列积压说明网络慢或界面文本过多，丢弃新请求而非无限堆积（下次界面重入会再次提交）。
+            AutoLog.Warn($"[AutoTranslator] 翻译队列已满（{MaxQueueLength}），丢弃请求 [{context}]");
+            return;
+        }
         TranslateStats.TaskSubmitted();
-        Task.Run(() =>
+        workQueue.Add(new WorkItem(context, work));
+        EnsureWorkerStarted();
+    }
+
+    /// <summary>确保后台工作线程已启动（懒启动，后台线程不阻止游戏退出）。</summary>
+    private static void EnsureWorkerStarted()
+    {
+        if (workerStarted)
+        {
+            return;
+        }
+        lock (workerLock)
+        {
+            if (workerStarted)
+            {
+                return;
+            }
+            workerStarted = true;
+            Thread worker = new(WorkerLoop)
+            {
+                IsBackground = true,
+                Name = "AutoTranslator.Worker",
+            };
+            worker.Start();
+        }
+    }
+
+    /// <summary>后台工作线程主循环：串行取出翻译任务执行，异常不吞、转交主线程。</summary>
+    private static void WorkerLoop()
+    {
+        foreach (WorkItem item in workQueue.GetConsumingEnumerable())
         {
             try
             {
-                work();
+                item.Work();
             }
             catch (Exception ex)
             {
-                ReportToMainThread(context, ex);
+                ReportToMainThread(item.Context, ex);
             }
             finally
             {
                 TranslateStats.TaskFinished();
-                // 收尾时若已无在跑任务，说明本轮翻译彻底结束，输出一次统计便于核对是否还有多余请求。
-                if (TranslateStats.RunningTasks == 0)
+                // 队列排空即本轮翻译结束，输出一次统计便于核对是否还有多余请求。
+                if (workQueue.Count == 0 && TranslateStats.RunningTasks == 0)
                 {
                     TranslateStats.LogSummary();
                 }
             }
-        });
+        }
     }
 
     /// <summary>把后台线程捕获的异常投递到主线程，用 RimWorld 日志输出完整堆栈。</summary>

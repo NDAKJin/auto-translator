@@ -14,6 +14,9 @@ public static class AutoTranslatorStartup
 {
     static AutoTranslatorStartup()
     {
+        // 登记主线程 ID：后台翻译线程记日志时据此跳过 Verse.Log（非线程安全），仅落文件。
+        AutoLog.MarkMainThread();
+
         // 启动阶段预热 store 字典：尽量在补丁生效前把 auto.xml 历史数据载入内存。
         // 若此刻 activeLanguage 尚未就绪（返回 null），加载会安全跳过，运行时首次查询仍会惰性补加载。
         AutoTranslationStore.TryLoadIfNeeded();
