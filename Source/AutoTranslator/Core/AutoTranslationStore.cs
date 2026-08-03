@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Xml;
+using UnityEngine;
 using Verse;
 
 namespace nomadicooer.AutoTranslator;
@@ -12,7 +13,7 @@ namespace nomadicooer.AutoTranslator;
 public static class AutoTranslationStore
 {
   private const int FlushThreshold = 50;                // 累积条数达此值落盘
-  private const int FlushIntervalMilliseconds = 3000;   // 距上次落盘超此时长落盘
+  private const int FlushIntervalMilliseconds = 10000;  // 距上次落盘超此时长落盘（正常退出有钩子兜底，可放宽）
   private static readonly string XmlRootTag = "LanguageData";
 
   private static readonly Dictionary<string, TranslationEntry> store = [];
@@ -24,6 +25,7 @@ public static class AutoTranslationStore
   private static volatile bool timerStarted;            // 定时器是否已启动（懒启动标志）
   private static Timer flushTimer;                      // 后台线程池定时器，非主线程
   private static bool loaded;                           // 是否已从磁盘加载历史（一次性）
+  private static volatile bool exitHookRegistered;      // 退出钩子是否已注册（一次性）
 
   // 翻译记录开关：由设置页通过 SetTranslationLogEnabled 注入，不反向依赖上层设置类
   private static bool enabledTranslationLog;
@@ -213,9 +215,11 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>懒启动后台定时器：首次写入口（RecordSource/RecordTranslation）调用时初始化，仅一次（双检锁）。</summary>
+  /// <summary>懒启动后台定时器：首次写入口（RecordSource/RecordTranslation）调用时初始化，仅一次（双检锁）。
+  /// 顺带注册退出钩子（同样仅一次），保证正常退出路径把最后一批未达阈值的脏数据刷盘。</summary>
   private static void EnsureTimerStarted()
   {
+    EnsureExitHookRegistered();
     if (timerStarted)
     {
       return;
@@ -227,6 +231,59 @@ public static class AutoTranslationStore
         flushTimer = new Timer(_ => FlushIfDirty(), null, FlushIntervalMilliseconds, FlushIntervalMilliseconds);
         timerStarted = true;
       }
+    }
+  }
+
+  /// <summary>注册退出时强制落盘钩子，仅一次（双检锁）。挂两处兜底，覆盖正常退出路径：
+  /// ① <see cref="Application.quitting"/>：Unity 退出流程刚开始时触发（Alt+F4 / 点 X / 游戏内退出），此时主线程与 RimWorld 静态状态仍可用，是首选时机；
+  /// ② <see cref="AppDomain.ProcessExit"/>：CLR 卸载前最后兜底，防止 Unity 事件因故未触发。
+  /// 两处都调用 <see cref="Flush"/>，Flush 内部 dirtyCount==0 会直接返回，重复调用安全（幂等）。
+  /// 注意：强制终止（taskkill /F、拔电源、蓝屏）任何钩子都不会执行，此类场景无解，由 10 秒定时器把损失控制在最后一个周期内。</summary>
+  private static void EnsureExitHookRegistered()
+  {
+    if (exitHookRegistered)
+    {
+      return;
+    }
+    lock (startLock)
+    {
+      if (exitHookRegistered)
+      {
+        return;
+      }
+      exitHookRegistered = true;
+      try
+      {
+        Application.quitting += FlushOnExit;
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => FlushOnExit();
+      }
+      catch (Exception ex)
+      {
+        AutoLog.Warn("注册退出落盘钩子失败", ex);
+      }
+    }
+  }
+
+  /// <summary>退出钩子回调：停掉定时器后强制落盘。异常吞掉，避免在退出流程里抛出打断游戏关闭。</summary>
+  private static void FlushOnExit()
+  {
+    try
+    {
+      lock (startLock)
+      {
+        if (timerStarted)
+        {
+          flushTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+          flushTimer?.Dispose();
+          flushTimer = null;
+          timerStarted = false;
+        }
+      }
+      Flush();
+    }
+    catch (Exception ex)
+    {
+      AutoLog.Warn("退出落盘失败", ex);
     }
   }
 
