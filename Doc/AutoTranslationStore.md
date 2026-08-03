@@ -40,7 +40,10 @@ flowchart TD
 - **原文不可缺**：`Source` 不得用 key 顶替。`RecordSource` 的 `source` 为空不入库；`RecordTranslation` 必须先有原文（无 existing 或 `Source` 为空直接打回），不存在"无原文凭空建译文"的路径。`SetTranslation`（用户改译文）同样要求已有原文。
 - **Writable 短路**：开关未开 或 当前语言为 English（源语言基准包）时不写、不落盘；DevMode 下游戏套变音伪本地化，跳过记录避免污染。
 - **Mutate 共用逻辑**：`RecordSource`/`RecordTranslation` 经私有 `Mutate(key, merge)` 加锁合并；`merge` 返回 null 即打回；`Verified=true` 条目整体跳过（自动路径不覆盖人工成果）。
-- **落盘**：达阈值 50 条立即 flush；另有定时 3s 与强制 Flush 触发（见 `AutoTranslationStore.cs`）。
+- **落盘**：达阈值 50 条立即 flush；另有定时 10s 与强制 Flush 触发（见 `AutoTranslationStore.cs`）。
+- **定时器生命周期**：首个写入口懒启动（双检锁保证全局唯一）；`FlushIfDirty` 发现无脏数据时自杀（停表+Dispose+复位 `timerStarted`），下次写入重新启动，空闲期不占线程池。
+- **退出落盘钩子**：`EnsureTimerStarted` 内一次性注册，双兜底覆盖正常退出路径——`Application.quitting`（Unity 退出流程首选时机，Alt+F4 / 点 X / 游戏内退出均走此路）与 `AppDomain.ProcessExit`（CLR 卸载前最后兜底）。回调 `FlushOnExit` 先停表再强制 `Flush`，异常吞掉不打断游戏关闭；`Flush` 在 `dirtyCount==0` 时直接返回，故重复触发幂等安全。
+- **不可救场景**：强制终止（任务管理器"结束进程树"、`taskkill /F`、拔电源、蓝屏）内核直接干掉进程，任何钩子都不执行；此类损失由 10s 定时器控制在最后一个周期内，属可接受范围（auto.xml 内容可由下次运行重新采集）。
 - **落盘字段语义（未译条目）**：无译文时 `Translation` 回退为原文、`translated="false"`，同时 `source` 属性保留原文。两种等价表达：
   - 译文位置写原文、`translated=false`（靠属性区分未译）；
   - 原文作为 `source` 属性保留。
