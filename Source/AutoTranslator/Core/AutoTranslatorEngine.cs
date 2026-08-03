@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using RimWorld;
 using Verse;
@@ -296,6 +297,31 @@ public static class AutoTranslatorEngine
                 Translate(key, source);
             }
         });
+    }
+
+    /// <summary>在系统默认程序中打开当前语言包 auto.xml（外部人工校对用）。路径无效（English/未就绪）时仅记日志。
+    /// 打开前强制 Flush 一次（dirtyCount==0 时直接返回，安全）确保文件已落盘，避免打开不存在的文件。</summary>
+    public static void OpenAutoXml()
+    {
+        AutoTranslationStore.Flush();
+        string path = AutoTranslationStore.GetAutoXmlPath();
+        if (string.IsNullOrEmpty(path))
+        {
+            AutoLog.Warn("当前语言为 English 或语言尚未就绪，无 auto.xml 可打开");
+            return;
+        }
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+            });
+        }
+        catch (System.Exception ex)
+        {
+            AutoLog.Error($"打开 auto.xml 失败：{path}\n{ex}");
+        }
     }
 
     /// <summary>刷新翻译源：重建派发器并据开关同步配置标志。按需异步，无需常驻线程；设置页保存或启动初始化时调用。</summary>

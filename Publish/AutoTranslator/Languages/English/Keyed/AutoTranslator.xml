@@ -25,5 +25,6 @@
   <AutoTranslator.SaveSettings>Save settings</AutoTranslator.SaveSettings>
   <AutoTranslator.ShowPassword>Show password</AutoTranslator.ShowPassword>
   <AutoTranslator.HidePassword>Hide password</AutoTranslator.HidePassword>
-  <AutoTranslator.TranslateAll>Translate all</AutoTranslator.TranslateAll>
+  <AutoTranslator.TranslationFilePathLabel>Translation file path</AutoTranslator.TranslationFilePathLabel>
+  <AutoTranslator.OpenXmlFile>Open translation file</AutoTranslator.OpenXmlFile>
 </LanguageData>

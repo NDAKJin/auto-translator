@@ -25,5 +25,6 @@
   <AutoTranslator.SaveSettings>保存设置</AutoTranslator.SaveSettings>
   <AutoTranslator.ShowPassword>显示密码</AutoTranslator.ShowPassword>
   <AutoTranslator.HidePassword>隐藏密码</AutoTranslator.HidePassword>
-  <AutoTranslator.TranslateAll>一键翻译</AutoTranslator.TranslateAll>
+  <AutoTranslator.TranslationFilePathLabel>翻译文件路径</AutoTranslator.TranslationFilePathLabel>
+  <AutoTranslator.OpenXmlFile>打开翻译文件</AutoTranslator.OpenXmlFile>
 </LanguageData>

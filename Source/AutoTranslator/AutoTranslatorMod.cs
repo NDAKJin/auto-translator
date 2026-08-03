@@ -82,10 +82,13 @@ public class AutoTranslatorMod : Mod
                 AutoTranslatorEngine.RefreshSources();
             }
 
-            // 一键翻译：把记录的未翻译 key 批量提交翻译并回写。仅在实时翻译关闭时意义明显。
-            if (listing.ButtonText(TranslateKeys.TranslateAll.Translate()))
+            // 翻译文件路径：label + 路径文本 + 打开文件按钮（外部人工校对用）
+            listing.Label(TranslateKeys.TranslationFilePathLabel.Translate());
+            string autoXmlPath = AutoTranslationStore.GetAutoXmlPath();
+            listing.Label(string.IsNullOrEmpty(autoXmlPath) ? "-" : autoXmlPath);
+            if (listing.ButtonText(TranslateKeys.OpenXmlFile.Translate()))
             {
-                AutoTranslatorEngine.TranslateAllPending();
+                AutoTranslatorEngine.OpenAutoXml();
             }
 
             // 平台勾选区

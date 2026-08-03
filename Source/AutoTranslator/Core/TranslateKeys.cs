@@ -31,5 +31,7 @@ public static class TranslateKeys
   public const string SaveSettings = "AutoTranslator.SaveSettings";
   public const string ShowPassword = "AutoTranslator.ShowPassword";
   public const string HidePassword = "AutoTranslator.HidePassword";
-  public const string TranslateAll = "AutoTranslator.TranslateAll";
+  public const string TranslationFilePath = "AutoTranslator.TranslationFilePath";
+  public const string TranslationFilePathLabel = "AutoTranslator.TranslationFilePathLabel";
+  public const string OpenXmlFile = "AutoTranslator.OpenXmlFile";
 }

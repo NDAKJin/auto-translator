@@ -357,6 +357,13 @@ public static class AutoTranslationStore
     }
   }
 
+  /// <summary>当前激活语言包 auto.xml 的完整路径（只读，不依赖写开关）；English 或未就绪返回 null。
+  /// 供设置页「打开翻译文件」按钮使用，无需启用翻译记录即可定位外部校对文件。</summary>
+  public static string GetAutoXmlPath()
+  {
+    return LoadXmlFilePath;
+  }
+
   /// <summary>序列化为 RimWorld Keyed 格式 xml，键按字母序稳定输出；经 XmlWriter 自动处理转义。</summary>
   private static string Serialize(Dictionary<string, TranslationEntry> data)
   {
