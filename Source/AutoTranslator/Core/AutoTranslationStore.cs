@@ -20,6 +20,7 @@ public static class AutoTranslationStore
 
   private static readonly object lockObj = new();       // 保护 store / dirtyCount
   private static readonly object startLock = new();     // 保护定时器懒启动
+  private static readonly object flushLock = new();     // 保护写盘（独立于 lockObj，避免写盘阻塞所有写入口）
   private static volatile bool timerStarted;            // 定时器是否已启动（懒启动标志）
   private static Timer flushTimer;                      // 后台线程池定时器，非主线程
   private static bool loaded;                           // 是否已从磁盘加载历史（一次性）
@@ -145,6 +146,11 @@ public static class AutoTranslationStore
     {
       return;
     }
+    if (!Writable || Prefs.DevMode)
+    {
+      return;
+    }
+    EnsureTimerStarted();
     TryLoad();
     bool needFlush;
     lock (lockObj)
@@ -178,6 +184,11 @@ public static class AutoTranslationStore
     {
       return;
     }
+    if (!Writable || Prefs.DevMode)
+    {
+      return;
+    }
+    EnsureTimerStarted();
     TryLoad();
     bool needFlush;
     lock (lockObj)
@@ -220,17 +231,21 @@ public static class AutoTranslationStore
   }
 
   /// <summary>定时器回调：有 dirty 才落盘；连续无写入时自杀——停掉并释放定时器、复位 timerStarted，
-  /// 让下次写入口能重新懒启动，避免空闲时一直占用线程池空转。</summary>
+  /// 让下次写入口能重新懒启动，避免空闲时一直占用线程池空转。
+  /// 注意：dirtyCount 判定与 Timer 销毁都在 startLock 内完成（判定在销毁前再确认一次），
+  /// 消除「刚清零又来新写入却被误杀」的竞态：写入路径若在销毁前完成则锁内重读能看到 dirtyCount>0 放弃自杀；
+  /// 若销毁后才到达（timerStarted=false）则写入口会重新懒启动。</summary>
   private static void FlushIfDirty()
   {
-    if (dirtyCount > 0)
-    {
-      Flush();
-      return;
-    }
-    // 无脏数据：停掉自身定时器（自杀），复位标志以便重新懒启动
+    bool shouldFlush;
     lock (startLock)
     {
+      // 在锁内重读 dirtyCount，确保判定与销毁原子：避免销毁瞬间新写入的脏数据遗留在死 Timer 上
+      shouldFlush = dirtyCount > 0;
+      if (shouldFlush)
+      {
+        return;
+      }
       if (timerStarted)
       {
         flushTimer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -239,35 +254,44 @@ public static class AutoTranslationStore
         timerStarted = false;
       }
     }
+    if (shouldFlush)
+    {
+      Flush();
+    }
   }
 
-  /// <summary>强制落盘：全量序列化写出 auto.xml；无写条件或无可写内容时返回。</summary>
+  /// <summary>强制落盘：全量序列化写出 auto.xml；无写条件或无可写内容时返回。
+  /// 整体在 flushLock 内（含 AutoXmlFilePath 取值与写盘），避免主线程与定时器线程并发写同一文件，
+  /// 也避免在非主线程访问 RimWorld 静态状态（LanguageDatabase.activeLanguage 等）时抛未捕获 NRE 导致进程崩溃。</summary>
   public static void Flush()
   {
-    if (!Writable || dirtyCount == 0)
+    lock (flushLock)
     {
-      return;
-    }
-    string path = AutoXmlFilePath;
-    if (path == null)
-    {
-      return;
-    }
-    // 短锁拷快照后立即释放锁，再由主线程外的定时器线程写盘，避免锁住共享状态
-    Dictionary<string, TranslationEntry> snapshot;
-    lock (lockObj)
-    {
-      snapshot = new Dictionary<string, TranslationEntry>(store);
-      dirtyCount = 0;
-    }
-    try
-    {
-      Directory.CreateDirectory(Path.GetDirectoryName(path));
-      File.WriteAllText(path, Serialize(snapshot), Encoding.UTF8);
-    }
-    catch (Exception ex)
-    {
-      AutoLog.Warn($"写入 auto.xml 失败: {path}", ex);
+      try
+      {
+        if (!Writable || dirtyCount == 0)
+        {
+          return;
+        }
+        string path = AutoXmlFilePath;
+        if (path == null)
+        {
+          return;
+        }
+        // 短锁拷快照后立即释放锁，再由主线程外的定时器线程写盘，避免锁住共享状态
+        Dictionary<string, TranslationEntry> snapshot;
+        lock (lockObj)
+        {
+          snapshot = new Dictionary<string, TranslationEntry>(store);
+          dirtyCount = 0;
+        }
+        Directory.CreateDirectory(Path.GetDirectoryName(path));
+        File.WriteAllText(path, Serialize(snapshot), Encoding.UTF8);
+      }
+      catch (Exception ex)
+      {
+        AutoLog.Warn("写入 auto.xml 失败", ex);
+      }
     }
   }
 
