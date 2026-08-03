@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -17,7 +16,13 @@ namespace nomadicooer.AutoTranslator;
 /// 请求地址：http://api.fanyi.baidu.com/api/trans/vip/translate
 /// 本类不依赖 RimWorld（无 Verse 引用），凭证通过构造函数注入，便于独立测试与复用。
 /// </summary>
-public class BaiduTranslate : TranslatePlatform
+/// <remarks>
+/// 构造一个百度翻译平台实例。
+/// </remarks>
+/// <param name="appId">百度翻译 APP ID。</param>
+/// <param name="secretKey">百度翻译密钥。</param>
+public class BaiduTranslate(string appId, string secretKey) 
+: TranslatePlatform(appId ?? string.Empty, secretKey ?? string.Empty)
 {
     // 平台标识键名（由调用方负责翻译为显示名，本类不引用 RimWorld 翻译机制）。
     // public 供 AutoTranslatorStartup 反射读取，按 cred.PlatformId 匹配实例化。
@@ -25,17 +30,8 @@ public class BaiduTranslate : TranslatePlatform
 
     private const string Endpoint = "http://api.fanyi.baidu.com/api/trans/vip/translate";
 
-    private readonly Random _random = new Random();
+    private readonly Random _random = new();
 
-    /// <summary>
-    /// 构造一个百度翻译平台实例。
-    /// </summary>
-    /// <param name="appId">百度翻译 APP ID。</param>
-    /// <param name="secretKey">百度翻译密钥。</param>
-    public BaiduTranslate(string appId, string secretKey)
-        : base(appId ?? string.Empty, secretKey ?? string.Empty)
-    {
-    }
 
     /// <summary>平台标识键名（由调用方负责翻译为显示名）。</summary>
     public override string PlatformName => PlatformNameKey;
@@ -104,24 +100,28 @@ public class BaiduTranslate : TranslatePlatform
     }
 
     /// <summary>
+    /// 百度可重试的临时故障码集合（限流/超时/系统繁忙等，重试可能恢复），
+    /// 命中这些码统一映射为 <see cref="TranslationErrorCode.RateLimited"/>。
+    /// </summary>
+    private static readonly HashSet<string> RetryableErrorCodes =
+    [
+        "54003", // 访问频率受限
+        "59004", // QPS 超限
+        "54005", // 长 query 请求频繁
+        "52001", // 请求超时
+        "52002", // 系统错误
+        "52003", // 未授权（服务端临时）→ 归为临时故障，重试可能恢复
+    ];
+
+    /// <summary>
     /// 将百度平台业务错误码映射为统一错误码（<see cref="TranslationErrorCode"/>）。
     /// 限流/超时/系统繁忙等瞬时故障 → RateLimited(1)；其余参数/语种/权限/余额类 → InvalidRequest(3)。
     /// </summary>
     private static TranslationErrorCode MapBaiduErrorCode(string code)
     {
-        switch (code)
-        {
-            // 可重试的临时故障
-            case "54003": // 访问频率受限
-            case "59004": // QPS 超限
-            case "54005": // 长 query 请求频繁
-            case "52001": // 请求超时
-            case "52002": // 系统错误
-            case "52003": // 未授权（服务端临时）→ 归为临时故障，重试可能恢复
-                return TranslationErrorCode.RateLimited;
-            default:
-                return TranslationErrorCode.InvalidRequest;
-        }
+        return RetryableErrorCodes.Contains(code)
+            ? TranslationErrorCode.RateLimited
+            : TranslationErrorCode.InvalidRequest;
     }
 
     /// <summary>
@@ -161,7 +161,8 @@ public class BaiduTranslate : TranslatePlatform
     /// 百度翻译错误码 -> 中文描述（含处理建议）。
     /// 依据百度翻译开放平台官方错误码表；52000 为成功，不在失败分支使用。
     /// </summary>
-    private static readonly Dictionary<string, string> ErrorMessages = new Dictionary<string, string>
+    private static readonly Dictionary<string, string> ErrorMessages = new()
+
     {
         { "52000", "成功" },
         { "52001", "请求超时，请检查原文及语种是否受支持" },
@@ -208,7 +209,8 @@ public class BaiduTranslate : TranslatePlatform
     /// 百度支持语种有限，未列出的返回 null。
     /// 代码依据百度官方语种列表（cht=繁体、sk=斯洛伐克、cat=加泰罗尼亚等）。
     /// </summary>
-    private static readonly Dictionary<string, string> RimWorldToBaidu = new Dictionary<string, string>
+    private static readonly Dictionary<string, string> RimWorldToBaidu = new()
+
     {
         { "English", "en" },
         { "ChineseSimplified", "zh" },
