@@ -36,23 +36,17 @@ public class VolcengineTranslate : TranslatePlatform
     private const string Algorithm = "HMAC-SHA256";
     private const string SignedHeaders = "content-type;host;x-content-sha256;x-date";
 
-    private readonly string _accessKey;
-    private readonly string _secretKey;
-
     /// <summary>
     /// 构造一个火山翻译平台实例。
     /// </summary>
     /// <param name="accessKey">火山引擎 AccessKey。</param>
     /// <param name="secretKey">火山引擎 SecretKey。</param>
     public VolcengineTranslate(string accessKey, string secretKey)
+        : base(accessKey ?? string.Empty, secretKey ?? string.Empty)
     {
-        _accessKey = accessKey ?? string.Empty;
-        _secretKey = secretKey ?? string.Empty;
     }
 
-    /// <summary>
-    /// 平台标识键名（由调用方负责翻译为显示名）。
-    /// </summary>
+    /// <summary>平台标识键名（由调用方负责翻译为显示名）。</summary>
     public override string PlatformName => PlatformNameKey;
 
     /// <summary>
@@ -94,82 +88,52 @@ public class VolcengineTranslate : TranslatePlatform
         { "Vietnamese", "vi" },
     };
 
-    /// <summary>
-    /// 将 RimWorld 语言文件夹名（如 "ChineseSimplified (简体中文)"）转换为火山翻译语言码。
-    /// 未知语言返回 null。
-    /// </summary>
     public override string GetLangCode(string name)
     {
-        string simple = TranslatePlatform.GetSimpleName(name);
+        string simple = GetSimpleName(name);
         return RimWorldToVolcengine.TryGetValue(simple, out string code) ? code : null;
     }
 
     /// <summary>
-    /// 调用火山文本翻译 API，将 text 从 source 翻译到 target。
-    /// 凭证通过构造函数注入；未配置或请求失败时记录日志并返回原文。
+    /// 具体翻译：from/to 已是火山的平台语言码，text 为非空原文。
     /// 注意：当前为同步实现（会阻塞调用线程），联调/正式版应改为异步。
     /// </summary>
-    public override TranslationResult Translate(string source, string target, string text)
+    protected override TranslationResult TranslateCore(string from, string to, string text)
     {
-        if (string.IsNullOrEmpty(_accessKey) || string.IsNullOrEmpty(_secretKey))
-        {
-            ApiLog.Debug("[AutoTranslator] 火山翻译凭证未配置，返回原文。");
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "火山翻译凭证未配置");
-        }
-
-        // 火山翻译不支持 auto 自动检测，source 必须为目标语言之外的具体语言码
-        if (string.IsNullOrEmpty(text))
-        {
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "待翻译文本为空");
-        }
-
-        if (string.IsNullOrEmpty(source))
-        {
-            ApiLog.Debug("[AutoTranslator] 火山翻译不支持源语言: " + source);
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "火山翻译不支持源语言: " + source);
-        }
-
-        if (string.IsNullOrEmpty(target))
-        {
-            ApiLog.Debug("[AutoTranslator] 火山翻译不支持目标语言: " + target);
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "火山翻译不支持目标语言: " + target);
-        }
-
-        string payload = "{\"SourceLanguage\":\"" + JsonEscape(source)
-                         + "\",\"TargetLanguage\":\"" + JsonEscape(target)
+        string payload = "{\"SourceLanguage\":\""
+                         + JsonEscape(from)
+                         + "\",\"TargetLanguage\":\""
+                         + JsonEscape(to)
                          + "\",\"TextList\":[\"" + JsonEscape(text) + "\"]}";
 
-        // 请求逻辑包进节流器：自动控制 QPS，撞到限流码时指数退避重试
+        try
         {
-            try
+            string response = SendRequest(payload);
+
+            // 火山错误信息位于 ResponseMetadata.Error.Code（数值码，如 -429；或字符串码如 Throttling）
+            string platformCode = ExtractField(response, "Code");
+            if (!string.IsNullOrEmpty(platformCode) && platformCode != "0" && platformCode != "200")
             {
-                string response = SendRequest(payload, _accessKey, _secretKey);
-
-                // 火山错误信息位于 ResponseMetadata.Error.Code（数值码，如 -429；或字符串码如 Throttling）
-                string platformCode = ExtractField(response, "Code");
-                if (!string.IsNullOrEmpty(platformCode) && platformCode != "0" && platformCode != "200")
-                {
-                    TranslationErrorCode code = MapVolcErrorCode(platformCode);
-                    string err = "火山翻译错误 " + platformCode + ": " + DescribeError(platformCode)
-                                  + "（" + ExtractField(response, "Message") + "）";
-                    ApiLog.Debug("[AutoTranslator] " + err);
-                    return TranslationResult.Fail(text, code, err);
-                }
-
-                string translated = ExtractTranslation(response);
-                if (string.IsNullOrEmpty(translated))
-                {
-                    ApiLog.Debug("[AutoTranslator] 火山翻译响应中未找到译文");
-                    return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译响应中未找到译文");
-                }
-
-                return TranslationResult.Ok(translated);
+                TranslationErrorCode code = MapVolcErrorCode(platformCode);
+                string err = "火山翻译错误 " + platformCode + ": " + DescribeError(ErrorMessages, platformCode)
+                              + "（" + ExtractField(response, "Message") + "）";
+                ApiLog.Debug("[AutoTranslator] " + err);
+                return TranslationResult.Fail(text, code, err);
             }
-            catch (Exception ex)
+
+            string translated = ExtractTranslation(response);
+            if (string.IsNullOrEmpty(translated))
             {
-                ApiLog.Debug("[AutoTranslator] 火山翻译请求失败: " + ex.Message);
-                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译请求失败: " + ex.Message);
+                ApiLog.Debug("[AutoTranslator] 火山翻译响应中未找到译文");
+                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译响应中未找到译文");
             }
+
+            return TranslationResult.Ok(translated);
+        }
+        catch (Exception ex)
+        {
+            ApiLog.Debug("[AutoTranslator] 火山翻译请求失败: " + ex.Message);
+            return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译请求失败: " + ex.Message);
         }
     }
 
@@ -200,20 +164,6 @@ public class VolcengineTranslate : TranslatePlatform
     }
 
     /// <summary>
-    /// 将火山翻译错误码翻译为可读中文描述（含解决方案提示）。
-    /// 未收录的错误码原样返回，便于排查。
-    /// </summary>
-    private static string DescribeError(string code)
-    {
-        if (string.IsNullOrEmpty(code))
-        {
-            return string.Empty;
-        }
-
-        return ErrorMessages.TryGetValue(code, out string message) ? message : "未收录的错误码";
-    }
-
-    /// <summary>
     /// 火山翻译错误码 -> 中文描述（含处理建议）。
     /// 依据火山引擎机器翻译（translate 2025-03-01）官方错误码表；
     /// 成功码为 0 / 200，不在失败分支使用。1000XX 为接口具体业务错误，详见 Message。
@@ -227,7 +177,7 @@ public class VolcengineTranslate : TranslatePlatform
         { "1000XX", "接口业务错误，详见 Message 信息" },
     };
 
-    private static string SendRequest(string payload, string accessKey, string secretKey)
+    private string SendRequest(string payload)
     {
         byte[] body = Encoding.UTF8.GetBytes(payload);
         DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -258,11 +208,11 @@ public class VolcengineTranslate : TranslatePlatform
         string stringToSign = Algorithm + "\n" + xDate + "\n" + scope + "\n"
                               + Sha256Hex(Encoding.UTF8.GetBytes(canonicalRequest));
 
-        byte[] signingKey = GetSignatureKey(secretKey, shortDate, Region, Service);
+        byte[] signingKey = GetSignatureKey(SecretKey, shortDate, Region, Service);
         string signature = HmacHex(signingKey, stringToSign);
 
         string authorization = Algorithm
-                               + " Credential=" + accessKey + "/" + scope
+                               + " Credential=" + AccessKey + "/" + scope
                                + ", SignedHeaders=" + SignedHeaders
                                + ", Signature=" + signature;
 
@@ -363,6 +313,7 @@ public class VolcengineTranslate : TranslatePlatform
         {
             sb.Append(b.ToString("x2", CultureInfo.InvariantCulture));
         }
+
         return sb.ToString();
     }
 
@@ -387,9 +338,11 @@ public class VolcengineTranslate : TranslatePlatform
                     {
                         sb.Append(c);
                     }
+
                     break;
             }
         }
+
         return sb.ToString();
     }
 }

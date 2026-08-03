@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
@@ -24,8 +25,6 @@ public class BaiduTranslate : TranslatePlatform
 
     private const string Endpoint = "http://api.fanyi.baidu.com/api/trans/vip/translate";
 
-    private readonly string _appId;
-    private readonly string _secretKey;
     private readonly Random _random = new Random();
 
     /// <summary>
@@ -34,14 +33,11 @@ public class BaiduTranslate : TranslatePlatform
     /// <param name="appId">百度翻译 APP ID。</param>
     /// <param name="secretKey">百度翻译密钥。</param>
     public BaiduTranslate(string appId, string secretKey)
+        : base(appId ?? string.Empty, secretKey ?? string.Empty)
     {
-        _appId = appId ?? string.Empty;
-        _secretKey = secretKey ?? string.Empty;
     }
 
-    /// <summary>
-    /// 平台标识键名（由调用方负责翻译为显示名）。
-    /// </summary>
+    /// <summary>平台标识键名（由调用方负责翻译为显示名）。</summary>
     public override string PlatformName => PlatformNameKey;
 
     /// <summary>
@@ -55,85 +51,55 @@ public class BaiduTranslate : TranslatePlatform
             return null;
         }
 
-        string simpleName = TranslatePlatform.GetSimpleName(rimWorldLangName);
+        string simpleName = GetSimpleName(rimWorldLangName);
         RimWorldToBaidu.TryGetValue(simpleName, out string code);
         return code;
     }
 
     /// <summary>
-    /// 调用百度翻译 API，将 text 从 source 翻译到 target。
-    /// 凭证通过构造函数注入；未配置或请求失败时记录日志并返回原文。
-    /// 注意：当前为同步实现（会阻塞调用线程）。
+    /// 具体翻译：from/to 已是百度平台语言码，text 为非空原文。
     /// </summary>
-    public override TranslationResult Translate(string source, string target, string text)
+    protected override TranslationResult TranslateCore(string from, string to, string text)
     {
-        if (string.IsNullOrEmpty(_appId) || string.IsNullOrEmpty(_secretKey))
+        try
         {
-            ApiLog.Debug("[AutoTranslator] 百度翻译凭证未配置，返回原文。");
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "百度翻译凭证未配置");
-        }
+            string salt = _random.Next(100000).ToString(CultureInfo.InvariantCulture);
+            string sign = Md5Hex(AccessKey + text + salt + SecretKey);
 
-        if (string.IsNullOrEmpty(text))
-        {
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "待翻译文本为空");
-        }
+            string url = Endpoint
+                         + "?q=" + Uri.EscapeDataString(text)
+                         + "&from=" + from
+                         + "&to=" + to
+                         + "&appid=" + Uri.EscapeDataString(AccessKey)
+                         + "&salt=" + salt
+                         + "&sign=" + sign;
 
-        string from = GetLangCode(source);
-        if (string.IsNullOrEmpty(from))
-        {
-            ApiLog.Debug("[AutoTranslator] 百度翻译不支持源语言: " + source);
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "百度翻译不支持源语言: " + source);
-        }
+            string response = HttpGet(url);
 
-        string to = GetLangCode(target);
-        if (string.IsNullOrEmpty(to))
-        {
-            ApiLog.Debug("[AutoTranslator] 百度翻译不支持目标语言: " + target);
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "百度翻译不支持目标语言: " + target);
-        }
-
-        // 请求逻辑包进节流器：自动控制 QPS，撞到限流码时指数退避重试
-        {
-            try
+            // 先检查业务错误码：成功时无 error_code 字段或为 52000，其余均为失败
+            string platformCode = ExtractField(response, "error_code");
+            if (!string.IsNullOrEmpty(platformCode) && platformCode != "52000")
             {
-                string salt = _random.Next(100000).ToString(CultureInfo.InvariantCulture);
-                string sign = Md5Hex(_appId + text + salt + _secretKey);
-
-                string url = Endpoint
-                             + "?q=" + Uri.EscapeDataString(text)
-                             + "&from=" + from
-                             + "&to=" + to
-                             + "&appid=" + Uri.EscapeDataString(_appId)
-                             + "&salt=" + salt
-                             + "&sign=" + sign;
-
-                string response = HttpGet(url);
-
-                // 先检查业务错误码：成功时无 error_code 字段或为 52000，其余均为失败
-                string platformCode = ExtractField(response, "error_code");
-                if (!string.IsNullOrEmpty(platformCode) && platformCode != "52000")
-                {
-                    TranslationErrorCode code = MapBaiduErrorCode(platformCode);
-                    string err = "百度翻译错误 " + platformCode + ": " + DescribeError(platformCode);
-                    ApiLog.Debug("[AutoTranslator] " + err
-                                    + "，原始信息: " + ExtractField(response, "error_msg"));
-                    return TranslationResult.Fail(text, code, err);
-                }
-
-                string translated = ExtractTranslation(response);
-                if (string.IsNullOrEmpty(translated))
-                {
-                    ApiLog.Debug("[AutoTranslator] 百度翻译响应中未找到译文");
-                    return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "百度翻译响应中未找到译文");
-                }
-
-                return TranslationResult.Ok(translated);
+                TranslationErrorCode code = MapBaiduErrorCode(platformCode);
+                string err = "百度翻译错误 " + platformCode + ": " + DescribeError(ErrorMessages, platformCode);
+                ApiLog.Debug("[AutoTranslator] " + err
+                                + "，原始信息: " + ExtractField(response, "error_msg"));
+                return TranslationResult.Fail(text, code, err);
             }
-            catch (Exception ex)
+
+            string translated = ExtractTranslation(response);
+            if (string.IsNullOrEmpty(translated))
             {
-                ApiLog.Debug("[AutoTranslator] 百度翻译请求失败: " + ex.Message);
-                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "百度翻译请求失败: " + ex.Message);
+                ApiLog.Debug("[AutoTranslator] 百度翻译响应中未找到译文");
+                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "百度翻译响应中未找到译文");
             }
+
+            return TranslationResult.Ok(translated);
+        }
+        catch (Exception ex)
+        {
+            ApiLog.Debug("[AutoTranslator] 百度翻译请求失败: " + ex.Message);
+            return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "百度翻译请求失败: " + ex.Message);
         }
     }
 
@@ -167,7 +133,7 @@ public class BaiduTranslate : TranslatePlatform
         request.Method = "GET";
         request.Timeout = 6000;
         using var response = (HttpWebResponse)request.GetResponse();
-        using var reader = new System.IO.StreamReader(response.GetResponseStream(), Encoding.GetEncoding("utf-8"));
+        using var reader = new StreamReader(response.GetResponseStream(), Encoding.GetEncoding("utf-8"));
         return reader.ReadToEnd();
     }
 
@@ -189,20 +155,6 @@ public class BaiduTranslate : TranslatePlatform
         }
 
         return UnescapeJson(m.Groups[1].Value);
-    }
-
-    /// <summary>
-    /// 将百度翻译错误码翻译为可读中文描述（含解决方案提示）。
-    /// 未收录的错误码原样返回，便于排查。
-    /// </summary>
-    private static string DescribeError(string code)
-    {
-        if (string.IsNullOrEmpty(code))
-        {
-            return string.Empty;
-        }
-
-        return ErrorMessages.TryGetValue(code, out string message) ? message : "未收录的错误码";
     }
 
     /// <summary>

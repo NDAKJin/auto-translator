@@ -1,7 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 
 namespace nomadicooer.AutoTranslator;
@@ -11,8 +9,9 @@ namespace nomadicooer.AutoTranslator;
 /// 统一负责节流与限流重试，并根据各翻译源返回的 TranslationResult 错误码，
 /// 对连续失败的源实施"关禁闭"（冷却）策略。
 /// 各翻译源类只负责发起请求并返回结果，不含任何节流/重试逻辑。
+/// 调度器自身实现 <see cref="ITranslationPlatform"/>（持有翻译源而非继承基类）。
 /// </summary>
-public class TranslationDispatcher : TranslatePlatform
+public class TranslationDispatcher : ITranslationPlatform
 {
     private const string DispatcherNameKey = "AutoTranslator.Dispatcher";
 
@@ -43,12 +42,12 @@ public class TranslationDispatcher : TranslatePlatform
     /// <summary>随机起点生成器（Random 模式下挑选起始源）。</summary>
     private readonly Random _rng = new Random();
 
-    private readonly List<TranslatePlatform> _sources = new List<TranslatePlatform>();
+    private readonly List<ITranslationPlatform> _sources = new List<ITranslationPlatform>();
 
     // 每个翻译源的运行时状态：连续失败计数、关禁闭截止时间戳、上次请求时间戳。
-    private readonly Dictionary<TranslatePlatform, int> _failCounts = new Dictionary<TranslatePlatform, int>();
-    private readonly Dictionary<TranslatePlatform, long> _cooldownUntil = new Dictionary<TranslatePlatform, long>();
-    private readonly Dictionary<TranslatePlatform, long> _lastRequestTicks = new Dictionary<TranslatePlatform, long>();
+    private readonly Dictionary<ITranslationPlatform, int> _failCounts = new Dictionary<ITranslationPlatform, int>();
+    private readonly Dictionary<ITranslationPlatform, long> _cooldownUntil = new Dictionary<ITranslationPlatform, long>();
+    private readonly Dictionary<ITranslationPlatform, long> _lastRequestTicks = new Dictionary<ITranslationPlatform, long>();
     private readonly object _stateLock = new object();
 
     /// <summary>
@@ -56,11 +55,11 @@ public class TranslationDispatcher : TranslatePlatform
     /// 调度类自身不创建任何翻译源实例。
     /// </summary>
     /// <param name="sources">参与翻译的源，按优先级排列（前者先尝试）。可为空。</param>
-    public TranslationDispatcher(IEnumerable<TranslatePlatform> sources = null)
+    public TranslationDispatcher(IEnumerable<ITranslationPlatform> sources = null)
     {
         if (sources != null)
         {
-            foreach (TranslatePlatform s in sources)
+            foreach (ITranslationPlatform s in sources)
             {
                 Register(s);
             }
@@ -72,7 +71,7 @@ public class TranslationDispatcher : TranslatePlatform
     /// 重复注册同一实例会被忽略。
     /// </summary>
     /// <param name="source">已 new 好的翻译源实例。</param>
-    public void Register(TranslatePlatform source)
+    public void Register(ITranslationPlatform source)
     {
         if (source == null)
         {
@@ -96,14 +95,14 @@ public class TranslationDispatcher : TranslatePlatform
     /// <summary>
     /// 调度器标识键名（由调用方负责翻译为显示名）。
     /// </summary>
-    public override string PlatformName => DispatcherNameKey;
+    public string PlatformName => DispatcherNameKey;
 
     /// <summary>
     /// 调度器本身不翻译、也不维护语言映射，故直接返回 null。
     /// 语言解析由各翻译源内部完成；Translate 已将 RimWorld 语言名透传给各源。
-    /// 外部不应调用本方法（仅为实现基类抽象契约而存在）。
+    /// 外部不应调用本方法（仅为实现接口契约而存在）。
     /// </summary>
-    public override string GetLangCode(string name) => null;
+    public string GetLangCode(string name) => null;
 
     /// <summary>
     /// 按注册顺序协调各翻译源：跳过关禁闭中的源，对可用源先限流重试，
@@ -114,20 +113,20 @@ public class TranslationDispatcher : TranslatePlatform
     /// <param name="target">目标语言（RimWorld 语言名，如 "ChineseSimplified (简体中文)"）。</param>
     /// <param name="text">待翻译的原文。</param>
     /// <returns>首个成功源的译文，或全部失败时的末源错误结果。</returns>
-    public override TranslationResult Translate(string source, string target, string text)
+    public TranslationResult Translate(string source, string target, string text)
     {
         if (_sources.Count == 0)
         {
-            Debug.WriteLine("[AutoTranslator] 翻译调度器无可用翻译源，返回原文。");
+            ApiLog.Debug("[AutoTranslator] 翻译调度器无可用翻译源，返回原文。");
             return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "翻译调度器无可用翻译源");
         }
 
         TranslationResult last = null;
-        List<TranslatePlatform> snapshot;
+        List<ITranslationPlatform> snapshot;
         int start;
         lock (_stateLock)
         {
-            snapshot = new List<TranslatePlatform>(_sources);
+            snapshot = new List<ITranslationPlatform>(_sources);
             // 随机模式：随机挑一个起点，平摊请求量、降低单源限流概率；顺序模式：始终从 0 开始。
             start = UseRandom ? _rng.Next(snapshot.Count) : 0;
         }
@@ -135,11 +134,11 @@ public class TranslationDispatcher : TranslatePlatform
         // 从 start 起回绕遍历一圈，使本请求平摊到不同起点，避免单源限流。
         for (int i = 0; i < snapshot.Count; i++)
         {
-            TranslatePlatform platform = snapshot[(start + i) % snapshot.Count];
+            ITranslationPlatform platform = snapshot[(start + i) % snapshot.Count];
 
             if (IsInCooldown(platform))
             {
-                Debug.WriteLine("[AutoTranslator] 翻译源 " + platform.PlatformName + " 处于关禁闭期，跳过。");
+                ApiLog.Debug("[AutoTranslator] 翻译源 " + platform.PlatformName + " 处于关禁闭期，跳过。");
                 continue;
             }
 
@@ -162,7 +161,7 @@ public class TranslationDispatcher : TranslatePlatform
     /// <summary>
     /// 对单个源发起请求；若返回限流（RateLimited），按退避重试同一源至多 MaxRetryOnRateLimit 次。
     /// </summary>
-    private TranslationResult TryWithRateLimitRetry(TranslatePlatform platform, string source, string target, string text)
+    private TranslationResult TryWithRateLimitRetry(ITranslationPlatform platform, string source, string target, string text)
     {
         TranslationResult result = platform.Translate(source, target, text);
         int retry = 0;
@@ -170,7 +169,7 @@ public class TranslationDispatcher : TranslatePlatform
         {
             retry++;
             int backoff = BaseBackoffMs * (1 << (retry - 1));
-            Debug.WriteLine("[AutoTranslator] 翻译源 " + platform.PlatformName
+            ApiLog.Debug("[AutoTranslator] 翻译源 " + platform.PlatformName
                             + " 限流，第 " + retry + " 次重试，等待 " + backoff + "ms。");
             Thread.Sleep(backoff);
             result = platform.Translate(source, target, text);
@@ -182,7 +181,7 @@ public class TranslationDispatcher : TranslatePlatform
     /// <summary>
     /// 保证对同一源两次请求之间至少间隔 MinIntervalMs（节流），避免突发触发平台限流。
     /// </summary>
-    private void EnsureMinInterval(TranslatePlatform platform)
+    private void EnsureMinInterval(ITranslationPlatform platform)
     {
         if (MinIntervalMs <= 0)
         {
@@ -207,7 +206,7 @@ public class TranslationDispatcher : TranslatePlatform
     /// <summary>
     /// 登记一次失败：连续失败计数 +1，超过 DisableThreshold 则将该源关禁闭 CooldownMs。
     /// </summary>
-    private void RegisterFail(TranslatePlatform platform)
+    private void RegisterFail(ITranslationPlatform platform)
     {
         lock (_stateLock)
         {
@@ -218,14 +217,14 @@ public class TranslationDispatcher : TranslatePlatform
             if (count > DisableThreshold)
             {
                 _cooldownUntil[platform] = DateTime.UtcNow.Ticks + CooldownMs * TimeSpan.TicksPerMillisecond;
-                Debug.WriteLine("[AutoTranslator] 翻译源 " + platform.PlatformName
+                ApiLog.Debug("[AutoTranslator] 翻译源 " + platform.PlatformName
                                 + " 连续失败 " + count + " 次，关禁闭 " + CooldownMs + "ms。");
             }
         }
     }
 
     /// <summary>重置指定源的失败计数与关禁闭状态（成功翻译后调用）。</summary>
-    private void ResetFail(TranslatePlatform platform)
+    private void ResetFail(ITranslationPlatform platform)
     {
         lock (_stateLock)
         {
@@ -235,7 +234,7 @@ public class TranslationDispatcher : TranslatePlatform
     }
 
     /// <summary>判断指定源当前是否处于关禁闭（冷却）期。</summary>
-    private bool IsInCooldown(TranslatePlatform platform)
+    private bool IsInCooldown(ITranslationPlatform platform)
     {
         lock (_stateLock)
         {

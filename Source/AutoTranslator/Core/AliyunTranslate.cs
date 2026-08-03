@@ -32,23 +32,17 @@ public class AliyunTranslate : TranslatePlatform
     private const string FormatType = "text";
     private const string Scene = "general";
 
-    private readonly string _accessKeyId;
-    private readonly string _accessKeySecret;
-
     /// <summary>
     /// 构造一个阿里云翻译平台实例。
     /// </summary>
     /// <param name="accessKeyId">阿里云 AccessKeyId。</param>
     /// <param name="accessKeySecret">阿里云 AccessKeySecret。</param>
     public AliyunTranslate(string accessKeyId, string accessKeySecret)
+        : base(accessKeyId ?? string.Empty, accessKeySecret ?? string.Empty)
     {
-        _accessKeyId = accessKeyId ?? string.Empty;
-        _accessKeySecret = accessKeySecret ?? string.Empty;
     }
 
-    /// <summary>
-    /// 平台标识键名（由调用方负责翻译为显示名）。
-    /// </summary>
+    /// <summary>平台标识键名（由调用方负责翻译为显示名）。</summary>
     public override string PlatformName => PlatformNameKey;
 
     /// <summary>
@@ -63,74 +57,44 @@ public class AliyunTranslate : TranslatePlatform
             return null;
         }
 
-        string simpleName = TranslatePlatform.GetSimpleName(rimWorldLangName);
+        string simpleName = GetSimpleName(rimWorldLangName);
         RimWorldToAliyun.TryGetValue(simpleName, out string code);
         return code;
     }
 
     /// <summary>
-    /// 调用阿里云翻译 API，将 text 从 source 翻译到 target。
-    /// 凭证通过构造函数注入；未配置或请求失败时记录日志并返回原文。
-    /// 注意：当前为同步实现（会阻塞调用线程）。
+    /// 具体翻译：from/to 已是阿里云平台语言码，text 为非空原文。
     /// </summary>
-    public override TranslationResult Translate(string source, string target, string text)
+    protected override TranslationResult TranslateCore(string from, string to, string text)
     {
-        if (string.IsNullOrEmpty(_accessKeyId) || string.IsNullOrEmpty(_accessKeySecret))
+        try
         {
-            ApiLog.Debug("[AutoTranslator] 阿里云翻译凭证未配置，返回原文。");
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "阿里云翻译凭证未配置");
-        }
+            string response = SendRequest(from, to, text);
 
-        if (string.IsNullOrEmpty(text))
-        {
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "待翻译文本为空");
-        }
-
-        string from = GetLangCode(source);
-        if (string.IsNullOrEmpty(from))
-        {
-            ApiLog.Debug("[AutoTranslator] 阿里云翻译不支持源语言: " + source);
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "阿里云翻译不支持源语言: " + source);
-        }
-
-        string to = GetLangCode(target);
-        if (string.IsNullOrEmpty(to))
-        {
-            ApiLog.Debug("[AutoTranslator] 阿里云翻译不支持目标语言: " + target);
-            return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "阿里云翻译不支持目标语言: " + target);
-        }
-
-        // 请求逻辑包进节流器：自动控制 QPS，撞到限流码时指数退避重试
-        {
-            try
+            // 先检查业务错误码：非 200 说明翻译失败，记录可读描述后返回原文
+            string platformCode = ExtractField(response, "Code");
+            if (!string.IsNullOrEmpty(platformCode) && platformCode != "200")
             {
-                string response = SendRequest(from, to, text);
-
-                // 先检查业务错误码：非 200 说明翻译失败，记录可读描述后返回原文
-                string platformCode = ExtractField(response, "Code");
-                if (!string.IsNullOrEmpty(platformCode) && platformCode != "200")
-                {
-                    TranslationErrorCode code = MapAliyunErrorCode(platformCode);
-                    string err = "阿里云翻译错误 " + platformCode + ": " + DescribeError(platformCode);
-                    ApiLog.Debug("[AutoTranslator] " + err
-                                    + "，原始信息: " + ExtractField(response, "Message"));
-                    return TranslationResult.Fail(text, code, err);
-                }
-
-                string translated = ExtractTranslation(response);
-                if (string.IsNullOrEmpty(translated))
-                {
-                    ApiLog.Debug("[AutoTranslator] 阿里云翻译响应中未找到译文");
-                    return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "阿里云翻译响应中未找到译文");
-                }
-
-                return TranslationResult.Ok(translated);
+                TranslationErrorCode code = MapAliyunErrorCode(platformCode);
+                string err = "阿里云翻译错误 " + platformCode + ": " + DescribeError(ErrorMessages, platformCode);
+                ApiLog.Debug("[AutoTranslator] " + err
+                                + "，原始信息: " + ExtractField(response, "Message"));
+                return TranslationResult.Fail(text, code, err);
             }
-            catch (Exception ex)
+
+            string translated = ExtractTranslation(response);
+            if (string.IsNullOrEmpty(translated))
             {
-                ApiLog.Debug("[AutoTranslator] 阿里云翻译请求失败: " + ex.Message);
-                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "阿里云翻译请求失败: " + ex.Message);
+                ApiLog.Debug("[AutoTranslator] 阿里云翻译响应中未找到译文");
+                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "阿里云翻译响应中未找到译文");
             }
+
+            return TranslationResult.Ok(translated);
+        }
+        catch (Exception ex)
+        {
+            ApiLog.Debug("[AutoTranslator] 阿里云翻译请求失败: " + ex.Message);
+            return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "阿里云翻译请求失败: " + ex.Message);
         }
     }
 
@@ -170,7 +134,7 @@ public class AliyunTranslate : TranslatePlatform
         {
             { "Format", "JSON" },
             { "Version", Version },
-            { "AccessKeyId", _accessKeyId },
+            { "AccessKeyId", AccessKey },
             { "SignatureMethod", "HMAC-SHA1" },
             { "SignatureVersion", "1.0" },
             { "SignatureNonce", Guid.NewGuid().ToString("N") },
@@ -196,7 +160,7 @@ public class AliyunTranslate : TranslatePlatform
         string stringToSign = "POST&" + PercentEncode("/") + "&" + PercentEncode(canonicalQuery);
 
         // 第三步：HMAC-SHA1，密钥为 AccessKeySecret + "&"，结果做 Base64（阿里云要求，非 Hex）
-        string signature = HmacSha1Base64(_accessKeySecret + "&", stringToSign);
+        string signature = HmacSha1Base64(SecretKey + "&", stringToSign);
 
         // 第四步：把签名追加到查询参数
         string finalQuery = canonicalQuery + "&" + PercentEncode("Signature") + "=" + PercentEncode(signature);
@@ -252,20 +216,6 @@ public class AliyunTranslate : TranslatePlatform
 
         Match m = Regex.Match(response, "\"Translated\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
         return m.Success ? UnescapeJson(m.Groups[1].Value) : null;
-    }
-
-    /// <summary>
-    /// 将阿里云机器翻译错误码翻译为可读中文描述。
-    /// 未收录的错误码原样返回，便于排查。
-    /// </summary>
-    private static string DescribeError(string code)
-    {
-        if (string.IsNullOrEmpty(code))
-        {
-            return string.Empty;
-        }
-
-        return ErrorMessages.TryGetValue(code, out string message) ? message : "未收录的错误码";
     }
 
     /// <summary>

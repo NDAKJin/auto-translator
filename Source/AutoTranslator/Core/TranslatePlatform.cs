@@ -7,32 +7,83 @@ using System.Text.RegularExpressions;
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>
-/// 翻译平台抽象基类。定义各翻译源必须实现的接口与共享的语言码解析辅助。
-/// 节流与限流重试统一由 TranslationDispatcher（调度类）负责，本基类不再包含相关逻辑。
+/// 翻译平台抽象基类，实现 <see cref="ITranslationPlatform"/> 并承载通用前置校验（模板方法）。
+/// <list type="bullet">
+///   <item><description>sealed <see cref="Translate"/> 统一做凭证/空文本/语言码校验，解析出平台语言码后调用抽象 <see cref="TranslateCore"/>。</description></item>
+///   <item><description>派生类只需实现 <see cref="TranslateCore"/>、<see cref="PlatformName"/>、<see cref="GetLangCode"/>，不再重复校验逻辑。</description></item>
+///   <item><description>提供 <see cref="FailLog"/> / <see cref="DescribeError"/> 等共用辅助，消除各引擎重复代码。</description></item>
+/// </list>
+/// 节流与限流重试统一由 TranslationDispatcher 负责，本基类不处理。
 /// </summary>
-public abstract class TranslatePlatform
+public abstract class TranslatePlatform : ITranslationPlatform
 {
-    /// <summary>
-    /// 平台标识键名（由调用方负责翻译为显示名，如 "AutoTranslator.Baidu"）。
-    /// </summary>
+    protected TranslatePlatform(string accessKey, string secretKey)
+    {
+        AccessKey = accessKey;
+        SecretKey = secretKey;
+    }
+
+    /// <summary>Access Key / APP ID</summary>
+    protected string AccessKey { get; }
+
+    /// <summary>Secret Key</summary>
+    protected string SecretKey { get; }
+
+    /// <summary>平台标识（带前缀的完整标志，如 "AutoTranslator.Baidu"）。</summary>
     public abstract string PlatformName { get; }
 
-    /// <summary>
-    /// 将 RimWorld 语言名（如 "ChineseSimplified (简体中文)"）转为平台所需的语言码。
-    /// 未知语言返回 null（派生类应据此返回 InvalidRequest）。
-    /// </summary>
-    /// <param name="name">RimWorld 语言名（含括号注释）。</param>
-    /// <returns>平台语言码；不支持时返回 null。</returns>
-    public abstract string GetLangCode(string name);
+    /// <summary>将 RimWorld 语言名转为平台语言码；不支持时返回 null。</summary>
+    public abstract string GetLangCode(string rimWorldLangFolderName);
 
     /// <summary>
-    /// 执行翻译。派生类应直接发起请求并返回结果，不含节流/重试逻辑。
+    /// 模板方法：先统一校验，再解析语言码，最后委派给 <see cref="TranslateCore"/>。
+    /// 派生类不应重写。
     /// </summary>
-    /// <param name="source">源语言（RimWorld 语言名，如 "English"）。</param>
-    /// <param name="target">目标语言（RimWorld 语言名）。</param>
-    /// <param name="text">待翻译原文。</param>
-    /// <returns>翻译结果。</returns>
-    public abstract TranslationResult Translate(string source, string target, string text);
+    public TranslationResult Translate(string source, string target, string text)
+    {
+        if (string.IsNullOrEmpty(AccessKey) || string.IsNullOrEmpty(SecretKey))
+        {
+            return FailLog("凭证未配置", TranslationErrorCode.InvalidRequest, null);
+        }
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return FailLog("待翻译文本为空", TranslationErrorCode.InvalidRequest, null);
+        }
+
+        string from = GetLangCode(source);
+        if (string.IsNullOrEmpty(from))
+        {
+            return FailLog($"不支持的源语言: {source}", TranslationErrorCode.InvalidRequest, null);
+        }
+
+        string to = GetLangCode(target);
+        if (string.IsNullOrEmpty(to))
+        {
+            return FailLog($"不支持的目标语言: {target}", TranslationErrorCode.InvalidRequest, null);
+        }
+
+        return TranslateCore(from, to, text);
+    }
+
+    /// <summary>具体翻译逻辑：from/to 已是平台语言码，text 为非空待译原文。</summary>
+    protected abstract TranslationResult TranslateCore(string from, string to, string text);
+
+    /// <summary>记录失败日志并返回失败结果（译文回退为原文 text）。</summary>
+    protected static TranslationResult FailLog(string message, TranslationErrorCode code, string rawError)
+    {
+        ApiLog.Debug(message);
+        return TranslationResult.Fail(string.Empty, code, rawError ?? message);
+    }
+
+    /// <summary>
+    /// 将平台错误码翻译为可读中文描述（含解决方案提示）。
+    /// 未收录的错误码原样返回，便于排查。
+    /// </summary>
+    protected static string DescribeError(IReadOnlyDictionary<string, string> errorMessages, string code)
+    {
+        return errorMessages.TryGetValue(code, out string desc) ? desc : code;
+    }
 
     /// <summary>
     /// 从 "中文 (Chinese)" 或 "Chinese" 中提取括号前或纯英文部分，用于语言码查表。
@@ -48,6 +99,13 @@ public abstract class TranslatePlatform
         return idx > 0 ? name.Substring(0, idx).Trim() : name.Trim();
     }
 
+    // 静态编译的 Regex 实例，避免每次请求 new Regex 的开销
+    private static readonly Regex StringFieldRegex =
+        new("\"(?<key>[^\"]+)\"\\s*:\\s*\"(?<val>(?:\\\\.|[^\"\\\\])*)\"", RegexOptions.Compiled);
+
+    private static readonly Regex NumberFieldRegex =
+        new("\"(?<key>[^\"]+)\"\\s*:\\s*(?<val>-?\\d+)", RegexOptions.Compiled);
+
     /// <summary>
     /// 从扁平 JSON 文本中提取某字段的值（不依赖外部 JSON 库）。
     /// 同时支持字符串字面量（"key":"value"，处理转义）与数字字面量（"key":100）。
@@ -57,13 +115,29 @@ public abstract class TranslatePlatform
     {
         if (string.IsNullOrEmpty(json) || string.IsNullOrEmpty(key)) return null;
 
-        // 字符串形式："key":"value"
-        Match str = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*\"((?:\\\\.|[^\"\\\\])*)\"");
-        if (str.Success) return UnescapeJson(str.Groups[1].Value);
+        Match str = StringFieldRegex.Match(json);
+        while (str.Success)
+        {
+            if (str.Groups["key"].Value == key)
+            {
+                return UnescapeJson(str.Groups["val"].Value);
+            }
 
-        // 数字形式："key":100
-        Match num = Regex.Match(json, "\"" + Regex.Escape(key) + "\"\\s*:\\s*(-?\\d+)");
-        return num.Success ? num.Groups[1].Value : null;
+            str = str.NextMatch();
+        }
+
+        Match num = NumberFieldRegex.Match(json);
+        while (num.Success)
+        {
+            if (num.Groups["key"].Value == key)
+            {
+                return num.Groups["val"].Value;
+            }
+
+            num = num.NextMatch();
+        }
+
+        return null;
     }
 
     /// <summary>
