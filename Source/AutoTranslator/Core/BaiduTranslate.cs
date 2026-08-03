@@ -105,11 +105,6 @@ public class BaiduTranslate(string appId, string secretKey)
     /// <summary>RimWorld 语言名 -> 百度语言码，未知返回 null。</summary>
     public override string GetLangCode(string rimWorldLangName)
     {
-        if (string.IsNullOrEmpty(rimWorldLangName))
-        {
-            return null;
-        }
-
         string simpleName = GetSimpleName(rimWorldLangName);
         RimWorldToBaidu.TryGetValue(simpleName, out string code);
         return code;
