@@ -393,6 +393,25 @@ public static class AutoTranslationStore
     }
   }
 
+  /// <summary>取出某 key 我们已生成的译文（Translated==true 且译文非空）。供上层直接回写界面，无需重复提交。</summary>
+  public static bool TryGetTranslation(string key, out string translation)
+  {
+    translation = null;
+    if (key == null)
+    {
+      return false;
+    }
+    lock (lockObj)
+    {
+      if (store.TryGetValue(key, out TranslationEntry e) && e.Translated && !e.Translation.NullOrEmpty())
+      {
+        translation = e.Translation;
+        return true;
+      }
+      return false;
+    }
+  }
+
   /// <summary>返回当前内存中所有未翻译（Translated=false）的条目（key, 源文），供「一键翻译」批量入队。</summary>
   public static IEnumerable<(string Key, string Source)> LoadUnTranslated()
   {

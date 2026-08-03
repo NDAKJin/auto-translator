@@ -22,14 +22,30 @@ internal static class TranslationPatch
         {
             return;
         }
-        // 老版逻辑：信任官方返回值。官方已处理（包括 activeLanguage==null 的异常短路、命中等）不接手。
+        // 信任官方返回值：官方已处理（命中或异常短路）不接手。
         if (__result)
         {
             return;
         }
-        // 老版逻辑：key 为空无意义，直接跳过。
+        // key 为空无意义，直接跳过。
         if (key == null)
         {
+            return;
+        }
+        // 官方未翻译，但我们已经翻译过：直接把已存译文回写 keyedReplacements 让界面生效，跳过记录与重复提交。
+        if (AutoTranslationStore.IsTranslated(key)
+            && AutoTranslationStore.TryGetTranslation(key, out string cached)
+            && !cached.NullOrEmpty())
+        {
+            LoadedLanguage active = LanguageDatabase.activeLanguage;
+            if (active != null && active.keyedReplacements != null)
+            {
+                active.keyedReplacements[key] = new LoadedLanguage.KeyedReplacement
+                {
+                    key = key,
+                    value = cached,
+                };
+            }
             return;
         }
         // 老版逻辑：激活语言就是默认语言（English）时无需翻译/记录。
