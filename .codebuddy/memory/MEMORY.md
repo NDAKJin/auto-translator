@@ -83,5 +83,6 @@ RimWorld 运行在 **Unity 2022.3.35 + Mono 运行时** 之上，模组程序集
 - auto.xml 约定：`TranslationPatch` 拦截 `TryTranslate` 失败时，将缺译条目写入当前激活语言包 `Languages/<当前语言>/Keyed/auto.xml`；English 作源语言基准包不写。回退 `result = key`，不调引擎、不写伪翻译。
 - key 写入规则：有 key 直接以官方原 key 落盘，不加前缀；仅无 key 裸文本/UI 文本才用 `AutoKeyPrefix = "auto."` 自建主键。
 - **每次改完代码都必须 git 提交**（用户明确要求）：完成一批改动后即时 `git add` 相关文件 + `git commit`，不要累积多批改动再一次性提交。提交信息用中文或中英混合、清晰描述本次改动。
+- **并发约定：翻译只用「一条专属后台线程 + 队列」，禁止线程池（用户明确要求，已因此踩过卡死大坑）**。严禁在翻译链路使用 `Task.Run` / `ThreadPool.QueueUserWorkItem`：`RequestTranslate` 是每个未翻译 key 各调一次，一个界面（如 PrepareLanding）能瞬间冒出几十个 key，`Task.Run` 会自动开几十条线程池线程并发跑同步阻塞 HTTP，占满 Mono 线程池后游戏自身拿不到 worker → 整体卡死。正确做法：主线程只 `workQueue.Add()` 立即返回（这就是"异步"，UI 不阻塞），由唯一的 `AutoTranslator.Worker` 线程（`BlockingCollection.GetConsumingEnumerable()`，`IsBackground=true`）串行消费；结果经 `LongEventHandler.ExecuteWhenFinished` 交回主线程写 `keyedReplacements`。所有对外 HTTP 必须设超时（现统一 6 秒）+ 复用 static HttpClient。Unity 协程不适用于此场景：协程跑在主线程上，只是分帧续跑、并非并发，放同步阻塞调用会直接卡死主线程。
 - **架构偏好：金字塔单向分层，禁止互相引用（用户明确要求）**。代码要自顶向下、上层依赖下层、下层绝不回头引用上层，人类读代码靠顺读一条线到底，不像机器能逐条回溯推理。出现 A↔B 双向依赖/互相调用（如 patch 类既拦截又被业务层回调）即视为坏味道，立即把被反向依赖的部分下沉为独立底层工具（例：`TranslationPatch` 与 `AutoTranslatorEngine` 互相引用 → 抽出 `AutoXmlWriter` 让 Engine 单向依赖它）。写代码前先想清楚分层与调用方向，不要写完等用户当 QA 点出循环引用。
 
