@@ -64,6 +64,17 @@ public class AutoTranslatorSettings : ModSettings
     public PlatformCredential GetCredential(string platformId) =>
         credentials.FirstOrDefault(c => c.PlatformId == platformId);
 
+    /// <summary>重置单个平台的凭据为默认（清空访问键与密钥）。</summary>
+    public void ResetPlatform(string platformId)
+    {
+        PlatformCredential cred = credentials.FirstOrDefault(c => c.PlatformId == platformId);
+        if (cred != null)
+        {
+            cred.AccessKey = string.Empty;
+            cred.SecretKey = string.Empty;
+        }
+    }
+
     /// <summary>确保所有已注册平台都有凭据对象（用于升级旧存档或新增平台时补齐）。</summary>
     public void EnsureAllPlatforms()
     {

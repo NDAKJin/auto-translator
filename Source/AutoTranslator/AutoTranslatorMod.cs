@@ -113,35 +113,14 @@ public class AutoTranslatorMod : Mod
                     // 密钥：同上
                     cred.SecretKey = DrawPasswordField(
                         listing, platformLabel + " · " + TranslateKeys.SecretKey.Translate(), cred.SecretKey, ref cred.showSecretKey);
+
+                    // 每个平台独占保存 / 恢复默认按钮，避免只有底部一组时无法对前面的凭据操作。
+                    listing.Gap(6f);
+                    DrawCredentialActionButtons(listing, cred);
                 }
             }
 
-            // 保存设置 / 恢复默认：两个按钮居中并排。
-            // 保存设置：明确写盘并刷新引擎（明确保存后才持久化）。
-            // 恢复默认：立即重置内存，但需点保存才落盘。
             listing.Gap(12f);
-            const float BottomButtonHeight = 28f;
-            const float ButtonSpacing = 4f;
-            const float CenterButtonWidth = 140f;
-            Rect bottomRow = listing.GetRect(BottomButtonHeight);
-            float btnW = Mathf.Min(CenterButtonWidth, (bottomRow.width - ButtonSpacing) / 2f);
-            float centerGroupW = btnW * 2f + ButtonSpacing;
-            float centerX = bottomRow.x + (bottomRow.width - centerGroupW) / 2f;
-            Rect saveRect = new Rect(centerX, bottomRow.y, btnW, bottomRow.height).Rounded();
-            Rect resetRect = new Rect(centerX + btnW + ButtonSpacing, bottomRow.y, btnW, bottomRow.height).Rounded();
-            if (Widgets.ButtonText(saveRect, TranslateKeys.SaveSettings.Translate()))
-            {
-                WriteSettings();
-                // 写盘后刷新引擎翻译源：补填/修改凭据立即生效，无需重启游戏。
-                AutoTranslatorEngine.RefreshSources();
-                SoundDefOf.Tick_High.PlayOneShot(SoundInfo.OnCamera(MaintenanceType.None));
-            }
-            if (Widgets.ButtonText(resetRect, TranslateKeys.ResetDefaults.Translate()))
-            {
-                settings.ResetToDefaults();
-                SoundDefOf.Tick_Low.PlayOneShot(SoundInfo.OnCamera(MaintenanceType.None));
-            }
-
             listing.End();
             Widgets.EndScrollView();
         }
@@ -161,6 +140,33 @@ public class AutoTranslatorMod : Mod
             {
                 settings.DisablePlatform(kv.Key);
             }
+        }
+    }
+
+    /// <summary>绘制单个凭据的保存 / 恢复默认按钮，居中并排。</summary>
+    private void DrawCredentialActionButtons(Listing_Standard listing, PlatformCredential cred)
+    {
+        const float ButtonHeight = 28f;
+        const float ButtonSpacing = 4f;
+        const float ButtonWidth = 120f;
+        Rect rowRect = listing.GetRect(ButtonHeight);
+        float groupW = ButtonWidth * 2f + ButtonSpacing;
+        float startX = rowRect.x + (rowRect.width - groupW) / 2f;
+        Rect saveRect = new Rect(startX, rowRect.y, ButtonWidth, rowRect.height).Rounded();
+        Rect resetRect = new Rect(startX + ButtonWidth + ButtonSpacing, rowRect.y, ButtonWidth, rowRect.height).Rounded();
+
+        if (Widgets.ButtonText(saveRect, TranslateKeys.SaveSettings.Translate()))
+        {
+            WriteSettings();
+            AutoTranslatorEngine.RefreshSources();
+            SoundDefOf.Tick_High.PlayOneShot(SoundInfo.OnCamera(MaintenanceType.None));
+        }
+        if (Widgets.ButtonText(resetRect, TranslateKeys.ResetDefaults.Translate()))
+        {
+            settings.ResetPlatform(cred.PlatformId);
+            WriteSettings();
+            AutoTranslatorEngine.RefreshSources();
+            SoundDefOf.Tick_Low.PlayOneShot(SoundInfo.OnCamera(MaintenanceType.None));
         }
     }
 
