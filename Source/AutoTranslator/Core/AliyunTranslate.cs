@@ -19,7 +19,13 @@ namespace nomadicooer.AutoTranslator;
 /// 以避免在 RimWorld 的 Mono 运行时下加载整套 NuGet 依赖。
 /// 本类不依赖 RimWorld（无 Verse 引用），凭证通过构造函数注入，便于独立测试与复用。
 /// </summary>
-public class AliyunTranslate : TranslatePlatform
+/// <remarks>
+/// 构造一个阿里云翻译平台实例。
+/// </remarks>
+/// <param name="accessKeyId">阿里云 AccessKeyId。</param>
+/// <param name="accessKeySecret">阿里云 AccessKeySecret。</param>
+public class AliyunTranslate(string accessKeyId, string accessKeySecret) 
+: TranslatePlatform(accessKeyId ?? string.Empty, accessKeySecret ?? string.Empty)
 {
     // 平台标识键名（由调用方负责翻译为显示名，本类不引用 RimWorld 翻译机制）。
     // public 供 AutoTranslatorStartup 反射读取，按 cred.PlatformId 匹配实例化。
@@ -32,15 +38,6 @@ public class AliyunTranslate : TranslatePlatform
     private const string FormatType = "text";
     private const string Scene = "general";
 
-    /// <summary>
-    /// 构造一个阿里云翻译平台实例。
-    /// </summary>
-    /// <param name="accessKeyId">阿里云 AccessKeyId。</param>
-    /// <param name="accessKeySecret">阿里云 AccessKeySecret。</param>
-    public AliyunTranslate(string accessKeyId, string accessKeySecret)
-        : base(accessKeyId ?? string.Empty, accessKeySecret ?? string.Empty)
-    {
-    }
 
     /// <summary>平台标识键名（由调用方负责翻译为显示名）。</summary>
     public override string PlatformName => PlatformNameKey;
@@ -52,11 +49,6 @@ public class AliyunTranslate : TranslatePlatform
     /// </summary>
     public override string GetLangCode(string rimWorldLangName)
     {
-        if (string.IsNullOrEmpty(rimWorldLangName))
-        {
-            return null;
-        }
-
         string simpleName = GetSimpleName(rimWorldLangName);
         RimWorldToAliyun.TryGetValue(simpleName, out string code);
         return code;
