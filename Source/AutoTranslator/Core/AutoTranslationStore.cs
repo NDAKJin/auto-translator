@@ -51,9 +51,6 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>记录一条翻译（写入口）：两阶段 —— 先存源文(text=原文, translated=false)，翻译后存译文(text=译文, translated=true)。
-  /// 源文/译文分两次调用、每次只传一个 text，按 key 合并：translated=false 填 Source 槽，translated=true 填 Translation 槽；
-  /// 译文为空回退为源文；translated 取 OR（终态 true 不被后到 false 覆盖）。translated 默认 false（源文阶段）。</summary>
   /// <summary>写入口一：记录源文（原文）。原文缺失（source 为空）不入库；原文不得用 key 顶替。
   /// 无该 key 时新建（译文回退为原文、Translated=false）；已有则仅在原文本空时补源文。</summary>
   public static void RecordSource(string key, string source)
@@ -66,6 +63,7 @@ public static class AutoTranslationStore
     {
       return;
     }
+    EnsureTimerStarted();
     TryLoad();
     Mutate(key, existing =>
     {
@@ -81,6 +79,8 @@ public static class AutoTranslationStore
     });
   }
 
+
+
   /// <summary>写入口二：记录译文。必须先有原文（之前未存入原文的打回不入库）；
   /// 译文为空不入库。Translated 置 true。</summary>
   public static void RecordTranslation(string key, string translation)
@@ -93,6 +93,7 @@ public static class AutoTranslationStore
     {
       return;
     }
+    EnsureTimerStarted();
     TryLoad();
     Mutate(key, existing =>
     {
