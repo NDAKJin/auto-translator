@@ -82,7 +82,8 @@ public class AutoTranslatorSettings : ModSettings
         {
             if (credentials.All(c => c.PlatformId != platformId))
             {
-                credentials.Add(new PlatformCredential { PlatformId = platformId, enabled = false });
+                // 与 PlatformCredential.enabled 默认值一致（true），避免首次进入时所有平台被默认禁用导致 Dispatcher.Count == 0。
+                credentials.Add(new PlatformCredential { PlatformId = platformId, enabled = true });
             }
         }
     }

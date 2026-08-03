@@ -15,8 +15,8 @@ public static class AutoLog
   /// <summary>调试开关：仅控制 Debug 级。默认 false。</summary>
   public static bool DebugEnabled { get; set; }
 
-  /// <summary>文件出口开关：true 时每条日志同步 append 到 mod 包目录 Logs/。默认 false。</summary>
-  public static bool EnabledToFile { get; set; }
+  /// <summary>文件出口开关：true 时每条日志同步 append 到 mod 包目录 Logs/。默认 true（联调期强制落盘，便于无日志可观测时定位）。</summary>
+  public static bool EnabledToFile { get; set; } = true;
 
   /// <summary>异常摘要开关：true 只输出「类型: 消息」，false 输出完整堆栈。默认 true。</summary>
   public static bool CompactException { get; set; } = true;
