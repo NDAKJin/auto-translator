@@ -380,6 +380,23 @@ public static class AutoTranslationStore
     return sb.ToString();
   }
 
+  /// <summary>返回当前内存中所有未翻译（Translated=false）的条目（key, 源文），供「一键翻译」批量入队。</summary>
+  public static IEnumerable<(string Key, string Source)> LoadUnTranslated()
+  {
+    List<(string, string)> result = new();
+    lock (lockObj)
+    {
+      foreach (TranslationEntry e in store.Values)
+      {
+        if (!e.Translated && !string.IsNullOrEmpty(e.Source))
+        {
+          result.Add((e.Key, e.Source));
+        }
+      }
+    }
+    return result;
+  }
+
   /// <summary>首次可写时从当前语言包 auto.xml 加载历史翻译到内存；仅填 store，不触 dirtyCount 以免落盘覆盖。</summary>
   private static void TryLoad()
   {

@@ -2,11 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 
-// 仅在 RimWorld 工程编译时引入 Verse，测试工程不定义 RIMWORLD，自动降级且不依赖 Assembly-CSharp。
-#if RIMWORLD
-using Verse;
-#endif
-
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>统一日志层：集中所有日志出口，分级 + 全局/调试开关 + 可选纯文本文件出口。
@@ -87,17 +82,17 @@ public static class AutoLog
 #if RIMWORLD
     if (level == "Warn")
     {
-      if (once) Log.WarningOnce(full, full.GetHashCode());
-      else Log.Warning(full);
+      if (once) Verse.Log.WarningOnce(full, full.GetHashCode());
+      else Verse.Log.Warning(full);
     }
     else if (level == "Error")
     {
-      if (once) Log.ErrorOnce(full, full.GetHashCode());
-      else Log.Error(full);
+      if (once) Verse.Log.ErrorOnce(full, full.GetHashCode());
+      else Verse.Log.Error(full);
     }
     else
     {
-      Log.Message(full);
+      Verse.Log.Message(full);
     }
 #else
     if (once) Debug.WriteLine($"[{level}] {full}");

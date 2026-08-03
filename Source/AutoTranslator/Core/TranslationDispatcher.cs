@@ -92,10 +92,48 @@ public class TranslationDispatcher : ITranslationPlatform
         }
     }
 
+    /// <summary>当前已注册翻译源数量。</summary>
+    public int Count => _sources.Count;
+
     /// <summary>
     /// 调度器标识键名（由调用方负责翻译为显示名）。
     /// </summary>
     public string PlatformName => DispatcherNameKey;
+
+    /// <summary>
+    /// 源语言码映射：转发到首个能识别该 RimWorld 语言名的翻译源；均无则返回 null。
+    /// source 为 RimWorld 语言名（如 "English"）。
+    /// </summary>
+    public string GetSourceLangCode(string rimWorldLangName)
+    {
+        foreach (ITranslationPlatform s in _sources)
+        {
+            string code = s.GetLangCode(rimWorldLangName);
+            if (!string.IsNullOrEmpty(code))
+            {
+                return code;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// 目标语言码映射：转发到首个能识别该 RimWorld 语言名的翻译源；均无则返回 null。
+    /// target 为 RimWorld 语言名（如 "ChineseSimplified (简体中文)"）。
+    /// </summary>
+    public string GetTargetLangCode(string rimWorldLangName)
+    {
+        foreach (ITranslationPlatform s in _sources)
+        {
+            string code = s.GetLangCode(rimWorldLangName);
+            if (!string.IsNullOrEmpty(code))
+            {
+                return code;
+            }
+        }
+        return null;
+    }
+
 
     /// <summary>
     /// 调度器本身不翻译、也不维护语言映射，故直接返回 null。

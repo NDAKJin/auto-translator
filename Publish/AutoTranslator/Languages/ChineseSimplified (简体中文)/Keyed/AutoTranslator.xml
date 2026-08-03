@@ -22,4 +22,8 @@
   <AutoTranslator.AccessKey>访问键</AutoTranslator.AccessKey>
   <AutoTranslator.SecretKey>密钥</AutoTranslator.SecretKey>
   <AutoTranslator.ResetDefaults>恢复默认设置</AutoTranslator.ResetDefaults>
+  <AutoTranslator.TranslateAll>一键翻译</AutoTranslator.TranslateAll>
+  <AutoTranslator.Baidu>百度翻译</AutoTranslator.Baidu>
+  <AutoTranslator.Aliyun>阿里云翻译</AutoTranslator.Aliyun>
+  <AutoTranslator.Volcengine>火山引擎翻译</AutoTranslator.Volcengine>
 </LanguageData>

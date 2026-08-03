@@ -1,20 +1,170 @@
+using System.Collections.Generic;
 using RimWorld;
 using UnityEngine;
 using Verse;
 
 namespace nomadicooer.AutoTranslator;
 
+/// <summary>
+/// 模组主入口。RimWorld 通过 Mod 程序集扫描此类加载设置页。
+/// 不挂 [StaticConstructorOnStartup]（注册 Harmony 由 AutoTranslatorStartup 负责）。
+/// 仅负责设置页渲染与生命周期入口，不在此做依赖 Def 的初始化。
+/// </summary>
 public class AutoTranslatorMod : Mod
 {
-  private readonly AutoTranslatorSettings settings;
-  public override string SettingsCategory() => TranslateKeys.SettingsCategory.Translate();
-  public AutoTranslatorMod(ModContentPack content) : base(content)
-  {
-    settings = GetSettings<AutoTranslatorSettings>();
+    /// <summary>模组实例（供静态上下文访问设置）。</summary>
+    public static AutoTranslatorMod Instance { get; private set; }
 
-  }
-  public override void DoSettingsWindowContents(Rect inRect)
-  {
-    settings.DoSettingsWindowContents(inRect);
-  }
+    /// <summary>是否启用自动翻译（总开关）。开启即拦截并必然记录；关闭后引擎停止、不再调 API。</summary>
+    public static bool AutoTranslateEnabled => Instance?.settings.enableAutoTranslate ?? true;
+
+    /// <summary>是否启用实时翻译。开启即边拦截边异步调 API 翻译并回写 keyedReplacements；关闭仅记录 key。</summary>
+    public static bool RealtimeUpdateEnabled => Instance?.settings.enableRealtimeUpdate ?? false;
+
+    /// <summary>模组设置实例（供引擎/启动初始化读取凭据）。</summary>
+    public static AutoTranslatorSettings Settings => Instance?.settings;
+
+    private readonly AutoTranslatorSettings settings;
+
+    public override string SettingsCategory() => TranslateKeys.SettingsCategory.Translate();
+
+    public AutoTranslatorMod(ModContentPack content) : base(content)
+    {
+        Instance = this;
+        settings = GetSettings<AutoTranslatorSettings>();
+    }
+
+    /// <summary>设置页滚动视图的纵向位移状态（跨帧保留）。</summary>
+    private Vector2 settingsScrollPos;
+
+    public override void DoSettingsWindowContents(Rect inRect)
+    {
+        const float ScrollBarMargin = 16f;
+        const float ViewHeight = 720f;
+        Rect outRect = inRect;
+        Rect viewRect = new Rect(0f, 0f, inRect.width - ScrollBarMargin, ViewHeight);
+
+        // 先收集用户在平台列表上的勾选状态，避免 listing 渲染期间增删 Credentials 触发控件错乱。
+        var platformChecks = new Dictionary<string, bool>();
+        foreach (string platformId in PlatformRegistry.AllPlatformNameKeys)
+        {
+            platformChecks[platformId] = settings.HasPlatform(platformId);
+        }
+
+        try
+        {
+            Widgets.BeginScrollView(outRect, ref settingsScrollPos, viewRect);
+            var listing = new Listing_Standard();
+            listing.Begin(viewRect);
+
+            // 基本信息（当前/默认语言）
+            Title.Draw(listing, TranslateKeys.BasicInfo.Translate());
+
+            // 三个总开关
+            listing.CheckboxLabeled(TranslateKeys.EnableAutoTranslate.Translate(), ref settings.enableAutoTranslate);
+            bool prevLog = settings.enableTranslationLog;
+            listing.CheckboxLabeled(TranslateKeys.EnableTranslationLog.Translate(), ref settings.enableTranslationLog);
+            if (prevLog != settings.enableTranslationLog)
+            {
+                AutoTranslationStore.SetTranslationLogEnabled(settings.enableTranslationLog);
+            }
+            listing.CheckboxLabeled(TranslateKeys.EnableRealtimeUpdate.Translate(), ref settings.enableRealtimeUpdate);
+
+            // 一键翻译：把记录的未翻译 key 批量提交翻译并回写。仅在实时翻译关闭时意义明显。
+            if (listing.ButtonText(TranslateKeys.TranslateAll.Translate()))
+            {
+                AutoTranslatorEngine.TranslateAllPending();
+            }
+
+            // 平台勾选区
+            listing.Gap(12f);
+            Title.Draw(listing, TranslateKeys.PlatformList.Translate());
+
+            foreach (string platformId in PlatformRegistry.AllPlatformNameKeys)
+            {
+                bool enabled = platformChecks[platformId];
+                listing.CheckboxLabeled(PlatformRegistry.LabelKeys[platformId].Translate(), ref enabled);
+                platformChecks[platformId] = enabled;
+            }
+
+            // 凭据折叠区：每行两行 TextEntryLabeled（访问键 / 密钥）
+            listing.Gap(12f);
+            DrawCollapsibleHeader(listing, TranslateKeys.CredentialTable.Translate());
+            if (!settings.credentialsCollapsed)
+            {
+                foreach (PlatformCredential cred in settings.credentials)
+                {
+                    listing.Gap(8f);
+                    string platformLabel = PlatformRegistry.LabelKeys.TryGetValue(cred.PlatformId, out string key)
+                        ? key.Translate()
+                        : cred.PlatformId;
+                    listing.Label(platformLabel);
+                    cred.AccessKey = listing.TextEntryLabeled(
+                        platformLabel + " · " + TranslateKeys.AccessKey.Translate(), cred.AccessKey);
+                    cred.SecretKey = listing.TextEntryLabeled(
+                        platformLabel + " · " + TranslateKeys.SecretKey.Translate(), cred.SecretKey);
+                }
+            }
+
+            // 恢复默认
+            listing.Gap(12f);
+            if (listing.ButtonText(TranslateKeys.ResetDefaults.Translate()))
+            {
+                settings.ResetToDefaults();
+            }
+
+            listing.End();
+            Widgets.EndScrollView();
+        }
+        catch (System.Exception ex)
+        {
+            AutoLog.Error("[AutoTranslator] DoSettingsWindowContents 异常: " + ex);
+        }
+
+        // listing 渲染完后再同步平台勾选状态到凭据列表（避开 repaint 期间增删集合）。
+        foreach (KeyValuePair<string, bool> kv in platformChecks)
+        {
+            if (kv.Value)
+            {
+                settings.EnablePlatform(kv.Key);
+            }
+            else
+            {
+                settings.DisablePlatform(kv.Key);
+            }
+        }
+
+        // 设置页持续编辑，必须主动写盘，否则退出后丢失。
+        WriteSettings();
+
+        // 写盘后即时刷新引擎翻译源：补填/修改凭据立即生效，无需重启游戏。
+        // 总开关/实时翻译关闭时，RefreshSources 内部会顺带停止引擎。
+        AutoTranslatorEngine.RefreshSources();
+    }
+
+    /// <summary>绘制加粗放大的可折叠 section 标题，左侧 ▶/▼ 三角形指示折叠状态，可点击切换。</summary>
+    private void DrawCollapsibleHeader(Listing_Standard listing, string text)
+    {
+        const float TriangleWidth = 24f;
+        const float HeaderHeight = 30f;
+        Rect rect = listing.GetRect(HeaderHeight);
+        GameFont previous = Text.Font;
+        Text.Font = GameFont.Medium;
+        try
+        {
+            Rect triangleRect = new Rect(rect.x, rect.y + (rect.height - TriangleWidth) / 2f, TriangleWidth, TriangleWidth);
+            if (Widgets.ButtonImage(triangleRect, settings.credentialsCollapsed ? TexButton.Reveal : TexButton.Collapse))
+            {
+                settings.credentialsCollapsed = !settings.credentialsCollapsed;
+            }
+
+            Rect textRect = new Rect(rect.x + TriangleWidth + 6f, rect.y, rect.width - TriangleWidth - 6f, rect.height);
+            Widgets.Label(textRect, text);
+        }
+        finally
+        {
+            Text.Font = previous;
+        }
+        listing.Gap(4f);
+    }
 }
