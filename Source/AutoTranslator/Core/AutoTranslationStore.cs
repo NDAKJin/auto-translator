@@ -20,10 +20,9 @@ public static class AutoTranslationStore
   private static int dirtyCount;                        // 自上次落盘新增/变更条数
 
   private static readonly object lockObj = new();       // 保护 store / dirtyCount
-  private static readonly object startLock = new();     // 保护定时器懒启动
   private static readonly object flushLock = new();     // 保护写盘（独立于 lockObj，避免写盘阻塞所有写入口）
-  private static volatile bool timerStarted;            // 定时器是否已启动（懒启动标志）
-  private static Timer flushTimer;                      // 后台线程池定时器，非主线程
+  private static readonly object hookLock = new();     // 保护退出钩子注册
+  private static Timer pendingFlushTimer;               // 防抖一次性定时器（临时工）：有脏数据才雇，10s 后 flush 一次自动消失
   private static bool loaded;                           // 是否已从磁盘加载历史（一次性）
   private static volatile bool exitHookRegistered;      // 退出钩子是否已注册（一次性）
 
@@ -66,7 +65,7 @@ public static class AutoTranslationStore
     {
       return;
     }
-    EnsureTimerStarted();
+    ScheduleFlush();
     TryLoad();
     Mutate(key, existing =>
     {
@@ -96,7 +95,7 @@ public static class AutoTranslationStore
     {
       return;
     }
-    EnsureTimerStarted();
+    ScheduleFlush();
     TryLoad();
     Mutate(key, existing =>
     {
@@ -152,7 +151,7 @@ public static class AutoTranslationStore
     {
       return;
     }
-    EnsureTimerStarted();
+    ScheduleFlush();
     TryLoad();
     bool needFlush;
     lock (lockObj)
@@ -190,7 +189,7 @@ public static class AutoTranslationStore
     {
       return;
     }
-    EnsureTimerStarted();
+    ScheduleFlush();
     TryLoad();
     bool needFlush;
     lock (lockObj)
@@ -215,37 +214,42 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>懒启动后台定时器：首次写入口（RecordSource/RecordTranslation）调用时初始化，仅一次（双检锁）。
-  /// 顺带注册退出钩子（同样仅一次），保证正常退出路径把最后一批未达阈值的脏数据刷盘。</summary>
-  private static void EnsureTimerStarted()
+  /// <summary>安排一次延迟落盘（防抖一次性定时器，即 JS 的 setTimeout 模式）：有脏数据时调用，
+  /// 若当前没有待触发的定时器就雇一个临时工，FlushIntervalMilliseconds 后 flush 一次自动消失；
+  /// 10 秒内又来新写入则不再雇（沿用已在排程的那次），天然防抖。顺带注册退出钩子（仅一次）。</summary>
+  private static void ScheduleFlush()
   {
     EnsureExitHookRegistered();
-    if (timerStarted)
+    // 已有待触发的临时工就不重复雇
+    if (Interlocked.CompareExchange(ref pendingFlushTimer, null, null) != null)
     {
       return;
     }
-    lock (startLock)
+    Timer t = new(_ =>
     {
-      if (!timerStarted)
-      {
-        flushTimer = new Timer(_ => FlushIfDirty(), null, FlushIntervalMilliseconds, FlushIntervalMilliseconds);
-        timerStarted = true;
-      }
+      Flush();
+      var old = Interlocked.Exchange(ref pendingFlushTimer, null);
+      old?.Dispose();
+    }, null, FlushIntervalMilliseconds, Timeout.Infinite);
+    // 若期间已有别的线程先雇了，丢弃本次的，避免两个定时器并存
+    if (Interlocked.CompareExchange(ref pendingFlushTimer, t, null) != null)
+    {
+      t.Dispose();
     }
   }
 
-  /// <summary>注册退出时强制落盘钩子，仅一次（双检锁）。挂两处兜底，覆盖正常退出路径：
+  /// <summary>注册退出时强制落盘钩子，仅一次。挂两处兜底，覆盖正常退出路径：
   /// ① <see cref="Application.quitting"/>：Unity 退出流程刚开始时触发（Alt+F4 / 点 X / 游戏内退出），此时主线程与 RimWorld 静态状态仍可用，是首选时机；
   /// ② <see cref="AppDomain.ProcessExit"/>：CLR 卸载前最后兜底，防止 Unity 事件因故未触发。
   /// 两处都调用 <see cref="Flush"/>，Flush 内部 dirtyCount==0 会直接返回，重复调用安全（幂等）。
-  /// 注意：强制终止（taskkill /F、拔电源、蓝屏）任何钩子都不会执行，此类场景无解，由 10 秒定时器把损失控制在最后一个周期内。</summary>
+  /// 注意：强制终止（taskkill /F、拔电源、蓝屏）任何钩子都不会执行，此类场景无解，由延迟落盘把损失控制在最后一个周期内。</summary>
   private static void EnsureExitHookRegistered()
   {
     if (exitHookRegistered)
     {
       return;
     }
-    lock (startLock)
+    lock (hookLock)
     {
       if (exitHookRegistered)
       {
@@ -264,56 +268,19 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>退出钩子回调：停掉定时器后强制落盘。异常吞掉，避免在退出流程里抛出打断游戏关闭。</summary>
+  /// <summary>退出钩子回调：立即落盘（不依赖待触发的定时器，它可能还没到 10 秒）。
+  /// 异常吞掉，避免在退出流程里抛出打断游戏关闭。</summary>
   private static void FlushOnExit()
   {
     try
     {
-      lock (startLock)
-      {
-        if (timerStarted)
-        {
-          flushTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-          flushTimer?.Dispose();
-          flushTimer = null;
-          timerStarted = false;
-        }
-      }
+      var t = Interlocked.Exchange(ref pendingFlushTimer, null);
+      t?.Dispose();
       Flush();
     }
     catch (Exception ex)
     {
       AutoLog.Warn("退出落盘失败", ex);
-    }
-  }
-
-  /// <summary>定时器回调：有 dirty 才落盘；连续无写入时自杀——停掉并释放定时器、复位 timerStarted，
-  /// 让下次写入口能重新懒启动，避免空闲时一直占用线程池空转。
-  /// 注意：dirtyCount 判定与 Timer 销毁都在 startLock 内完成（判定在销毁前再确认一次），
-  /// 消除「刚清零又来新写入却被误杀」的竞态：写入路径若在销毁前完成则锁内重读能看到 dirtyCount>0 放弃自杀；
-  /// 若销毁后才到达（timerStarted=false）则写入口会重新懒启动。</summary>
-  private static void FlushIfDirty()
-  {
-    bool shouldFlush;
-    lock (startLock)
-    {
-      // 在锁内重读 dirtyCount，确保判定与销毁原子：避免销毁瞬间新写入的脏数据遗留在死 Timer 上
-      shouldFlush = dirtyCount > 0;
-      if (shouldFlush)
-      {
-        return;
-      }
-      if (timerStarted)
-      {
-        flushTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        flushTimer?.Dispose();
-        flushTimer = null;
-        timerStarted = false;
-      }
-    }
-    if (shouldFlush)
-    {
-      Flush();
     }
   }
 
