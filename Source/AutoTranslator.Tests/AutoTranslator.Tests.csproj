@@ -19,4 +19,12 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
 
+  <!-- 纯逻辑源文件链接：直接编译主工程的独立类，避免 ProjectReference 引入 net472 +
+       本机 RimWorld DLL 依赖。仅链接无 Verse/Unity 依赖的纯逻辑文件。 -->
+  <ItemGroup>
+    <Compile Include="..\AutoTranslator\Core\Obfuscation.cs" Link="LinkedSources\Obfuscation.cs" />
+    <Compile Include="..\AutoTranslator\Core\TranslationResult.cs" Link="LinkedSources\TranslationResult.cs" />
+    <Compile Include="..\AutoTranslator\Core\TranslationErrorCode.cs" Link="LinkedSources\TranslationErrorCode.cs" />
+  </ItemGroup>
+
 </Project>
