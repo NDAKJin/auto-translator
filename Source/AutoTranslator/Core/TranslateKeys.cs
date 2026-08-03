@@ -28,5 +28,6 @@ public static class TranslateKeys
   public const string AccessKey = "AutoTranslator.AccessKey";
   public const string SecretKey = "AutoTranslator.SecretKey";
   public const string ResetDefaults = "AutoTranslator.ResetDefaults";
+  public const string SaveSettings = "AutoTranslator.SaveSettings";
   public const string TranslateAll = "AutoTranslator.TranslateAll";
 }

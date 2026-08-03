@@ -22,5 +22,6 @@
   <AutoTranslator.AccessKey>访问键</AutoTranslator.AccessKey>
   <AutoTranslator.SecretKey>密钥</AutoTranslator.SecretKey>
   <AutoTranslator.ResetDefaults>恢复默认设置</AutoTranslator.ResetDefaults>
+  <AutoTranslator.SaveSettings>保存设置</AutoTranslator.SaveSettings>
   <AutoTranslator.TranslateAll>一键翻译</AutoTranslator.TranslateAll>
 </LanguageData>

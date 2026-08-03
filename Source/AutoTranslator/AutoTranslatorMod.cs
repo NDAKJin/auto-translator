@@ -111,11 +111,22 @@ public class AutoTranslatorMod : Mod
                 }
             }
 
-            // 恢复默认
+            // 恢复默认 / 保存设置：两个按钮并排同一行。
+            // 恢复默认：立即重置内存；保存设置：明确写盘并刷新引擎（明确保存后才持久化）。
             listing.Gap(12f);
-            if (listing.ButtonText(TranslateKeys.ResetDefaults.Translate()))
+            const float BottomButtonHeight = 32f;
+            Rect bottomRow = listing.GetRect(BottomButtonHeight);
+            Rect resetRect = bottomRow.LeftHalf().Rounded();
+            Rect saveRect = bottomRow.RightHalf().Rounded();
+            if (Widgets.ButtonText(resetRect, TranslateKeys.ResetDefaults.Translate()))
             {
                 settings.ResetToDefaults();
+            }
+            if (Widgets.ButtonText(saveRect, TranslateKeys.SaveSettings.Translate()))
+            {
+                WriteSettings();
+                // 写盘后刷新引擎翻译源：补填/修改凭据立即生效，无需重启游戏。
+                AutoTranslatorEngine.RefreshSources();
             }
 
             listing.End();
@@ -138,13 +149,6 @@ public class AutoTranslatorMod : Mod
                 settings.DisablePlatform(kv.Key);
             }
         }
-
-        // 设置页持续编辑，必须主动写盘，否则退出后丢失。
-        WriteSettings();
-
-        // 写盘后即时刷新引擎翻译源：补填/修改凭据立即生效，无需重启游戏。
-        // 总开关/实时翻译关闭时，RefreshSources 内部会顺带停止引擎。
-        AutoTranslatorEngine.RefreshSources();
     }
 
     /// <summary>绘制加粗放大的可折叠 section 标题，左侧 ▶/▼ 三角形指示折叠状态，可点击切换。</summary>

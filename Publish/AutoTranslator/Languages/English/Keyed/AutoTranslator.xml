@@ -22,5 +22,6 @@
   <AutoTranslator.AccessKey>Access key</AutoTranslator.AccessKey>
   <AutoTranslator.SecretKey>Secret key</AutoTranslator.SecretKey>
   <AutoTranslator.ResetDefaults>Reset to defaults</AutoTranslator.ResetDefaults>
+  <AutoTranslator.SaveSettings>Save settings</AutoTranslator.SaveSettings>
   <AutoTranslator.TranslateAll>Translate all</AutoTranslator.TranslateAll>
 </LanguageData>
