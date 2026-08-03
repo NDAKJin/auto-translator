@@ -23,5 +23,7 @@
   <AutoTranslator.SecretKey>Secret key</AutoTranslator.SecretKey>
   <AutoTranslator.ResetDefaults>Reset to defaults</AutoTranslator.ResetDefaults>
   <AutoTranslator.SaveSettings>Save settings</AutoTranslator.SaveSettings>
+  <AutoTranslator.ShowPassword>Show password</AutoTranslator.ShowPassword>
+  <AutoTranslator.HidePassword>Hide password</AutoTranslator.HidePassword>
   <AutoTranslator.TranslateAll>Translate all</AutoTranslator.TranslateAll>
 </LanguageData>

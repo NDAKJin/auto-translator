@@ -37,6 +37,9 @@ public class AutoTranslatorMod : Mod
     /// <summary>设置页滚动视图的纵向位移状态（跨帧保留）。</summary>
     private Vector2 settingsScrollPos;
 
+    /// <summary>凭据密码框是否显示明文（眼睛按钮切换）。</summary>
+    private bool showPasswords;
+
     public override void DoSettingsWindowContents(Rect inRect)
     {
         const float ScrollBarMargin = 16f;
@@ -103,31 +106,41 @@ public class AutoTranslatorMod : Mod
 
                     // 访问键：真实值存 cred.AccessKey（label 字段，隐藏），输入框用密码框打码，改后同步写回。
                     cred.AccessKey = DrawPasswordField(
-                        listing, platformLabel + " · " + TranslateKeys.AccessKey.Translate(), cred.AccessKey);
+                        listing, platformLabel + " · " + TranslateKeys.AccessKey.Translate(), cred.AccessKey, showPasswords);
 
                     // 密钥：同上
                     cred.SecretKey = DrawPasswordField(
-                        listing, platformLabel + " · " + TranslateKeys.SecretKey.Translate(), cred.SecretKey);
+                        listing, platformLabel + " · " + TranslateKeys.SecretKey.Translate(), cred.SecretKey, showPasswords);
                 }
             }
 
-            // 恢复默认 / 保存设置：两个按钮并排同一行。
-            // 恢复默认：立即重置内存；保存设置：明确写盘并刷新引擎（明确保存后才持久化）。
+            // 保存设置 / 恢复默认：两个按钮并排同一行，右侧加眼睛切换密码显示。
+            // 保存设置：明确写盘并刷新引擎（明确保存后才持久化）。
+            // 恢复默认：立即重置内存，但需点保存才落盘。
             listing.Gap(12f);
-            const float BottomButtonHeight = 32f;
+            const float BottomButtonHeight = 28f;
+            const float EyeButtonSize = 28f;
+            const float EyeSpacing = 4f;
             Rect bottomRow = listing.GetRect(BottomButtonHeight);
-            Rect resetRect = bottomRow.LeftHalf().Rounded();
-            Rect saveRect = bottomRow.RightHalf().Rounded();
-            if (Widgets.ButtonText(resetRect, TranslateKeys.ResetDefaults.Translate()))
-            {
-                settings.ResetToDefaults();
-            }
+            float pairWidth = (bottomRow.width - EyeButtonSize - EyeSpacing) / 2f;
+            Rect saveRect = new Rect(bottomRow.x, bottomRow.y, pairWidth, bottomRow.height).Rounded();
+            Rect resetRect = new Rect(bottomRow.x + pairWidth + EyeSpacing, bottomRow.y, pairWidth, bottomRow.height).Rounded();
+            Rect eyeRect = new Rect(bottomRow.xMax - EyeButtonSize, bottomRow.y, EyeButtonSize, bottomRow.height).Rounded();
             if (Widgets.ButtonText(saveRect, TranslateKeys.SaveSettings.Translate()))
             {
                 WriteSettings();
                 // 写盘后刷新引擎翻译源：补填/修改凭据立即生效，无需重启游戏。
                 AutoTranslatorEngine.RefreshSources();
             }
+            if (Widgets.ButtonText(resetRect, TranslateKeys.ResetDefaults.Translate()))
+            {
+                settings.ResetToDefaults();
+            }
+            if (Widgets.ButtonImage(eyeRect, TexButton.Reveal))
+            {
+                showPasswords = !showPasswords;
+            }
+            TooltipHandler.TipRegion(eyeRect, (showPasswords ? TranslateKeys.HidePassword : TranslateKeys.ShowPassword).Translate());
 
             listing.End();
             Widgets.EndScrollView();
@@ -178,10 +191,10 @@ public class AutoTranslatorMod : Mod
     }
 
     /// <summary>
-    /// 密码框封装（仿 TextEntryLabeled）：左半 label + 右半 GUI.PasswordField。
-    /// 真实值存于 realValue（调用方持有的 label 字段，隐藏）；输入框全 * 打码，用户改动后返回真实输入同步写回。
+    /// 密码框封装（仿 TextEntryLabeled）：左半 label + 右半输入框。
+    /// 真实值存于 realValue（调用方持有的 label 字段，隐藏）；输入框全 * 打码或明文显示，用户改动后返回真实输入同步写回。
     /// </summary>
-    private string DrawPasswordField(Listing_Standard listing, string label, string realValue)
+    private string DrawPasswordField(Listing_Standard listing, string label, string realValue, bool showPassword)
     {
         Rect rect = listing.GetRect(Text.LineHeight);
         Rect labelRect = rect.LeftHalf().Rounded();
@@ -199,6 +212,9 @@ public class AutoTranslatorMod : Mod
             Text.Font = oldFont;
             Text.Anchor = oldAnchor;
         }
-        return GUI.PasswordField(fieldRect, realValue ?? string.Empty, '*', Text.CurTextFieldStyle);
+        string safeValue = realValue ?? string.Empty;
+        return showPassword
+            ? GUI.TextField(fieldRect, safeValue, Text.CurTextFieldStyle)
+            : GUI.PasswordField(fieldRect, safeValue, '*', Text.CurTextFieldStyle);
     }
 }
