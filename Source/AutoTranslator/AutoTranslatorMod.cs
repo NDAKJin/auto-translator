@@ -181,7 +181,19 @@ public class AutoTranslatorMod : Mod
         Rect rect = listing.GetRect(Text.LineHeight);
         Rect labelRect = rect.LeftHalf().Rounded();
         Rect fieldRect = rect.RightHalf().Rounded();
-        Widgets.Label(labelRect, label);
-        return GUI.PasswordField(fieldRect, realValue, '*', Text.CurTextFieldStyle);
+        GameFont oldFont = Text.Font;
+        TextAnchor oldAnchor = Text.Anchor;
+        Text.Font = GameFont.Small;
+        Text.Anchor = TextAnchor.MiddleRight;
+        try
+        {
+            Widgets.Label(labelRect, label);
+        }
+        finally
+        {
+            Text.Font = oldFont;
+            Text.Anchor = oldAnchor;
+        }
+        return GUI.PasswordField(fieldRect, realValue ?? string.Empty, '*', Text.CurTextFieldStyle);
     }
 }

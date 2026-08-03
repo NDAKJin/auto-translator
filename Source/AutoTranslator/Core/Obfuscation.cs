@@ -24,12 +24,12 @@ public static class Obfuscation
         return System.Convert.ToBase64String(bytes);
     }
 
-    /// <summary>还原混淆串。失败返回原串（兼容旧明文存档）。</summary>
+    /// <summary>还原混淆串。空值返回空串（不返回 null，避免 UI 控件 NRE）；失败返回原串（兼容旧明文存档）。</summary>
     public static string Decode(string encoded)
     {
         if (string.IsNullOrEmpty(encoded))
         {
-            return encoded;
+            return string.Empty;
         }
         try
         {
