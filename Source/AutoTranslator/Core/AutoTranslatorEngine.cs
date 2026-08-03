@@ -1,45 +1,26 @@
-using System.Collections.Concurrent;
-using System.Reflection;
-using System.Threading;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using RimWorld;
-using UnityEngine;
 using Verse;
 
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>
-/// 自动翻译引擎：统一管理翻译源（启用的平台凭据）、后台异步翻译线程、
+/// 自动翻译引擎：统一管理翻译源（启用的平台凭据）、按需异步翻译（Task.Run，不阻塞主线程），
 /// 把官方未翻译的 key 提交翻译并回写到 keyedReplacements / auto.xml。
-/// 以新逻辑为主：落盘统一走 AutoTranslationStore（取代旧版 AutoXmlWriter），
-/// 日志统一走 AutoLog（取代旧版 Logger）。
+/// 落盘统一走 AutoTranslationStore，日志统一走 AutoLog。
+/// 不常驻线程：主线程拦截到漏译时提交一条异步任务，由线程池后台执行翻译并回写。
 /// </summary>
 public static class AutoTranslatorEngine
 {
-    /// <summary>翻译请求队列项。</summary>
-    private sealed class TranslationTask
-    {
-        public string Key { get; set; }
-        public string SourceLangCode { get; set; }
-        public string TargetLangCode { get; set; }
-        public string Text { get; set; }
-    }
-
-    // 翻译请求队列：拦截线程（主线程）入队，后台翻译线程出队。
-    private static readonly ConcurrentQueue<TranslationTask> TranslationQueue = new();
-
     // 当前合用的翻译派发器（持有已注册、已注入凭据的平台源）；首次拦截/刷新时构建。
     private static TranslationDispatcher Dispatcher;
-
-    // 后台翻译线程。
-    private static Thread backgroundThread;
 
     // 引擎是否已配置并运行（有可用平台源 + 实时翻译开关开启）。
     private static volatile bool configured;
 
-    // 后台线程是否应继续运行（控制线程退出）。
-    private static volatile bool keepRunning;
-
-    // 配置线程锁：避免刷新与拦截并发改 Dispatcher。
+    // 配置锁：避免刷新与拦截并发改 Dispatcher。
     private static readonly object configLock = new();
 
     /// <summary>构建或重建翻译源：把设置里已启用的平台凭据注入对应平台实例并注册到派发器。</summary>
@@ -95,62 +76,39 @@ public static class AutoTranslatorEngine
         return false;
     }
 
-    /// <summary>后台线程主循环：从队列取任务翻译，成功回写并落盘。</summary>
-    private static void RunTranslateTask()
+    /// <summary>执行单条翻译：调派发器翻译，成功回写 keyedReplacements + 落盘 Store；失败记录原文占位。在线程池后台执行。</summary>
+    private static void Translate(string key, string text)
     {
-        // 等配置就绪（首次刷新前 Dispatcher 为空）。
-        while (!keepRunning)
-        {
-            Thread.Sleep(40);
-        }
-
-        while (keepRunning)
-        {
-            // 未配置（无可用源或实时翻译关）时清空队列并等待，避免无谓占用。
-            if (!configured || Dispatcher == null || Dispatcher.Count == 0)
-            {
-                while (TranslationQueue.TryDequeue(out _)) { }
-                Thread.Sleep(200);
-                continue;
-            }
-
-            if (!TranslationQueue.TryDequeue(out TranslationTask task))
-            {
-                Thread.Sleep(40);
-                continue;
-            }
-
-            Translate(task);
-        }
-    }
-
-    /// <summary>执行单条翻译：调派发器翻译，成功回写 keyedReplacements + 落盘 Store；失败记录原文占位。</summary>
-    private static void Translate(TranslationTask task)
-    {
-        if (string.IsNullOrEmpty(task.Text))
+        if (string.IsNullOrEmpty(text))
         {
             return;
         }
 
-        string sourceCode = Dispatcher.GetSourceLangCode(LanguageDatabase.defaultLanguage.folderName);
-        string targetCode = Dispatcher.GetTargetLangCode(LanguageDatabase.activeLanguage.folderName);
+        TranslationDispatcher dispatcher = Dispatcher;
+        if (dispatcher == null || dispatcher.Count == 0)
+        {
+            return;
+        }
+
+        string sourceCode = dispatcher.GetSourceLangCode(LanguageDatabase.defaultLanguage.folderName);
+        string targetCode = dispatcher.GetTargetLangCode(LanguageDatabase.activeLanguage.folderName);
         if (string.IsNullOrEmpty(sourceCode) || string.IsNullOrEmpty(targetCode))
         {
-            AutoLog.Warn($"语言码映射失败（source={sourceCode}, target={targetCode}），跳过 {task.Key}");
+            AutoLog.Warn($"语言码映射失败（source={sourceCode}, target={targetCode}），跳过 {key}");
             return;
         }
 
-        TranslationResult result = Dispatcher.Translate(sourceCode, targetCode, task.Text);
+        TranslationResult result = dispatcher.Translate(sourceCode, targetCode, text);
         if (result.Success && !string.IsNullOrEmpty(result.TranslatedText))
         {
-            string translated = SanitizeResult(task.Text, result.TranslatedText);
-            WriteToRimWorld(task.Key, translated);
-            AutoTranslationStore.RecordTranslation(task.Key, translated);
+            string translated = SanitizeResult(text, result.TranslatedText);
+            WriteToRimWorld(key, translated);
+            AutoTranslationStore.RecordTranslation(key, translated);
         }
         else
         {
             // 翻译失败：原文已通过拦截时的 RecordSource 立条，这里仅记日志，不重复入库。
-            AutoLog.Warn($"翻译失败 [{task.Key}]：{result.ErrorCode} {result.RawError}");
+            AutoLog.Warn($"翻译失败 [{key}]：{result.ErrorCode} {result.RawError}");
         }
     }
 
@@ -197,7 +155,7 @@ public static class AutoTranslatorEngine
         return translated;
     }
 
-    /// <summary>提交一条翻译请求（主线程拦截时调用）。</summary>
+    /// <summary>提交一条翻译请求（主线程拦截时调用）。后台 Task.Run 执行，不阻塞主线程。</summary>
     public static void RequestTranslate(string key, string text)
     {
         if (!configured || Dispatcher == null || Dispatcher.Count == 0)
@@ -208,14 +166,13 @@ public static class AutoTranslatorEngine
         {
             return;
         }
-        TranslationQueue.Enqueue(new TranslationTask
-        {
-            Key = key,
-            Text = text,
-        });
+
+        string capturedKey = key;
+        string capturedText = text;
+        Task.Run(() => Translate(capturedKey, capturedText));
     }
 
-    /// <summary>一键翻译：把当前未翻译的已记录条目批量提交翻译。</summary>
+    /// <summary>一键翻译：把当前未翻译的已记录条目批量提交翻译（后台异步执行，不阻塞主线程）。</summary>
     public static void TranslateAllPending()
     {
         if (!configured || Dispatcher == null || Dispatcher.Count == 0)
@@ -223,13 +180,17 @@ public static class AutoTranslatorEngine
             AutoLog.Warn("翻译源未就绪，无法一键翻译（请先在设置页启用平台并填入凭据）");
             return;
         }
-        foreach ((string key, string source) in AutoTranslationStore.LoadUnTranslated())
+
+        Task.Run(() =>
         {
-            RequestTranslate(key, source);
-        }
+            foreach ((string key, string source) in AutoTranslationStore.LoadUnTranslated())
+            {
+                Translate(key, source);
+            }
+        });
     }
 
-    /// <summary>刷新翻译源并据开关启动/停止引擎。设置页保存或启动初始化时调用；无凭据时已安全空源，无需重启。</summary>
+    /// <summary>刷新翻译源：重建派发器并据开关同步配置标志。按需异步，无需常驻线程；设置页保存或启动初始化时调用。</summary>
     public static void RefreshSources()
     {
         lock (configLock)
@@ -240,30 +201,10 @@ public static class AutoTranslatorEngine
                              && Dispatcher != null
                              && Dispatcher.Count > 0;
 
-            if (shouldRun)
-            {
-                configured = true;
-                if (backgroundThread == null)
-                {
-                    keepRunning = true;
-                    backgroundThread = new Thread(RunTranslateTask) { IsBackground = true, Name = "AutoTranslator" };
-                    backgroundThread.Start();
-                    AutoLog.Info("自动翻译引擎已启动");
-                }
-            }
-            else
-            {
-                configured = false;
-                Stop();
-                AutoLog.Info("自动翻译引擎已停止（无可用平台或实时翻译关闭）");
-            }
+            configured = shouldRun;
+            AutoLog.Info(shouldRun
+                ? $"翻译源就绪，引擎已启用（{Dispatcher.Count} 个可用平台）"
+                : "翻译源未就绪，引擎已停用（无可用平台或实时翻译关闭）");
         }
-    }
-
-    /// <summary>停止后台线程（仅停止运行，保留 Dispatcher/配置以便再次启动）。</summary>
-    private static void Stop()
-    {
-        keepRunning = false;
-        backgroundThread = null;
     }
 }
