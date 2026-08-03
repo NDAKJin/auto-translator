@@ -61,6 +61,11 @@ public static class AutoTranslationStore
     {
       return;
     }
+    // 已有原文且已译（官方/本 mod 已提供译文）：无需重复入库，直接跳过。
+    if (HasSource(key) && IsTranslated(key))
+    {
+      return;
+    }
     if (!Writable || Prefs.DevMode)
     {
       return;
@@ -83,11 +88,31 @@ public static class AutoTranslationStore
 
 
 
+  /// <summary>查询某 key 是否已记录原文（Source 非空）。供上层判断：原文缺失时不该入库译文，
+  /// 以及官方/本 mod 已提供译文时无需重复记录。</summary>
+  public static bool HasSource(string key)
+  {
+    if (key == null)
+    {
+      return false;
+    }
+    TryLoadIfNeeded();
+    lock (lockObj)
+    {
+      return store.TryGetValue(key, out TranslationEntry e) && !string.IsNullOrEmpty(e.Source);
+    }
+  }
+
   /// <summary>写入口二：记录译文。必须先有原文（之前未存入原文的打回不入库）；
   /// 译文为空不入库。Translated 置 true。</summary>
   public static void RecordTranslation(string key, string translation)
   {
     if (key == null || string.IsNullOrEmpty(translation))
+    {
+      return;
+    }
+    // 显式守卫：无原文则打回（官方/本 mod 已译但我们无原文时不应入库脏数据）。
+    if (!HasSource(key))
     {
       return;
     }
@@ -99,7 +124,7 @@ public static class AutoTranslationStore
     TryLoad();
     Mutate(key, existing =>
     {
-      // 译文阶段必须先有原文：无 existing 或其 Source 为空则打回
+      // 译文阶段必须先有原文：无 existing 或其 Source 为空则打回（兜底，上面已守卫）
       if (existing == null || string.IsNullOrEmpty(existing.Source))
       {
         return null;
@@ -319,12 +344,14 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>当前激活语言包 auto.xml 路径；English 或无效时返回 null。</summary>
-  private static string AutoXmlFilePath
+  /// <summary>当前激活语言包 auto.xml 路径（只读加载用）：只要激活语言已就绪且非 English 即返回路径，
+  /// 不依赖 enableTranslationLog 写开关——历史数据加载是「读」，与「能否写」无关，启动阶段只读路径也该能载入。</summary>
+  private static string LoadXmlFilePath
   {
     get
     {
-      if (!Writable)
+      if (LanguageDatabase.activeLanguage == null
+          || LanguageDatabase.activeLanguage == LanguageDatabase.defaultLanguage)
       {
         return null;
       }
@@ -335,6 +362,19 @@ public static class AutoTranslationStore
         folder,
         "Keyed",
         AutoTranslatorGlobals.AutoXmlFileName);
+    }
+  }
+
+  /// <summary>当前激活语言包 auto.xml 路径（写入用）；English、未就绪或写开关关闭时返回 null。</summary>
+  private static string AutoXmlFilePath
+  {
+    get
+    {
+      if (!Writable)
+      {
+        return null;
+      }
+      return LoadXmlFilePath;
     }
   }
 
@@ -387,6 +427,7 @@ public static class AutoTranslationStore
     {
       return false;
     }
+    TryLoadIfNeeded();
     lock (lockObj)
     {
       return store.TryGetValue(key, out TranslationEntry e) && e.Translated;
@@ -401,6 +442,7 @@ public static class AutoTranslationStore
     {
       return false;
     }
+    TryLoadIfNeeded();
     lock (lockObj)
     {
       if (store.TryGetValue(key, out TranslationEntry e) && e.Translated && !e.Translation.NullOrEmpty())
@@ -429,7 +471,8 @@ public static class AutoTranslationStore
     return result;
   }
 
-  /// <summary>首次可写时从当前语言包 auto.xml 加载历史翻译到内存；仅填 store，不触 dirtyCount 以免落盘覆盖。</summary>
+  /// <summary>首次从当前语言包 auto.xml 加载历史翻译到内存；仅填 store，不触 dirtyCount 以免落盘覆盖。
+  /// 使用只读路径（LoadXmlFilePath），不依赖写开关，启动阶段/只读查询也能触发加载。</summary>
   private static void TryLoad()
   {
     if (loaded)
@@ -437,7 +480,7 @@ public static class AutoTranslationStore
       return;
     }
     loaded = true;
-    string path = AutoXmlFilePath;
+    string path = LoadXmlFilePath;
     if (path == null || !File.Exists(path))
     {
       return;
@@ -487,6 +530,17 @@ public static class AutoTranslationStore
     catch (Exception ex)
     {
       AutoLog.Warn($"加载 auto.xml 失败: {path}", ex);
+    }
+  }
+
+  /// <summary>惰性加载入口：读路径（HasSource/IsTranslated/TryGetTranslation）与写路径共用，
+  /// 也可在启动阶段显式调用预热。旧实现只在写入口触发 TryLoad，导致启动阶段只读查询
+  /// （Postfix 早期进入）时 store 永远为空；改为读入口也触发，确保 Postfix 第一次查询前字典已填充。</summary>
+  public static void TryLoadIfNeeded()
+  {
+    if (!loaded)
+    {
+      TryLoad();
     }
   }
 }
