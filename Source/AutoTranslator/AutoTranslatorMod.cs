@@ -74,7 +74,13 @@ public class AutoTranslatorMod : Mod
                 AutoTranslationStore.SetTranslationLogEnabled(settings.enableTranslationLog);
                 AutoLog.Enabled = settings.enableTranslationLog;
             }
+            bool prevRealtime = settings.enableRealtimeUpdate;
             listing.CheckboxLabeled(TranslateKeys.EnableRealtimeUpdate.Translate(), ref settings.enableRealtimeUpdate);
+            if (prevRealtime != settings.enableRealtimeUpdate)
+            {
+                // 实时翻译开关变化即时刷新引擎（无需点保存）：开启则立即启用，关闭则停用。
+                AutoTranslatorEngine.RefreshSources();
+            }
 
             // 一键翻译：把记录的未翻译 key 批量提交翻译并回写。仅在实时翻译关闭时意义明显。
             if (listing.ButtonText(TranslateKeys.TranslateAll.Translate()))
@@ -130,8 +136,14 @@ public class AutoTranslatorMod : Mod
         }
 
         // listing 渲染完后再同步平台勾选状态到凭据列表（避开 repaint 期间增删集合）。
+        bool platformChanged = false;
         foreach (KeyValuePair<string, bool> kv in platformChecks)
         {
+            bool current = settings.HasPlatform(kv.Key);
+            if (current != kv.Value)
+            {
+                platformChanged = true;
+            }
             if (kv.Value)
             {
                 settings.EnablePlatform(kv.Key);
@@ -140,6 +152,12 @@ public class AutoTranslatorMod : Mod
             {
                 settings.DisablePlatform(kv.Key);
             }
+        }
+
+        // 平台勾选变化即时刷新引擎（启用/禁用某个翻译源立即生效，无需点保存）。
+        if (platformChanged)
+        {
+            AutoTranslatorEngine.RefreshSources();
         }
     }
 
