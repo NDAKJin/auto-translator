@@ -380,6 +380,19 @@ public static class AutoTranslationStore
     return sb.ToString();
   }
 
+  /// <summary>查询某 key 我们是否已生成译文（Translated==true）。供上层直接判断译状态，无需反向推断。</summary>
+  public static bool IsTranslated(string key)
+  {
+    if (key == null)
+    {
+      return false;
+    }
+    lock (lockObj)
+    {
+      return store.TryGetValue(key, out TranslationEntry e) && e.Translated;
+    }
+  }
+
   /// <summary>返回当前内存中所有未翻译（Translated=false）的条目（key, 源文），供「一键翻译」批量入队。</summary>
   public static IEnumerable<(string Key, string Source)> LoadUnTranslated()
   {
