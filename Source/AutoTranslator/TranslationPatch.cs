@@ -13,17 +13,11 @@ namespace nomadicooer.AutoTranslator;
 [HarmonyPatch(typeof(Translator), nameof(Translator.TryTranslate))]
 internal static class TranslationPatch
 {
-    /// <summary>官方翻译失败时（__result == false）触发记录与回写。</summary>
-    /// <param name="__result">官方 TryTranslate 的返回值：true=官方已处理（命中或异常短路），false=官方无该 key 译文。</param>
-    private static void Postfix(string key, ref TaggedString result, bool __result)
+    /// <summary>拦截官方 TryTranslate：查本模组是否已翻译，已译则回写译文直接返回；否则记录并提交实时翻译。</summary>
+    private static void Postfix(string key)
     {
         // 总开关关闭则不拦截。
         if (!AutoTranslatorMod.AutoTranslateEnabled)
-        {
-            return;
-        }
-        // 官方已翻译（命中或异常短路）不接手。
-        if (__result)
         {
             return;
         }
@@ -32,7 +26,8 @@ internal static class TranslationPatch
         {
             return;
         }
-        // 官方未翻译：查我们是否已翻译。已翻译则回写已存译文让界面生效并直接返回，不重复记录/提交。
+        // 查我们是否已翻译：已翻译则回写已存译文让界面生效并直接返回，不重复记录/提交。
+        // 不再以官方返回值（__result）作为是否接手的判断依据。
         if (AutoTranslationStore.IsTranslated(key)
             && AutoTranslationStore.TryGetTranslation(key, out string cached)
             && !cached.NullOrEmpty())
