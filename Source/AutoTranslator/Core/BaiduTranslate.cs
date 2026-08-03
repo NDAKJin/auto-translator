@@ -10,28 +10,21 @@ using System.Text.RegularExpressions;
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>
-/// 百度翻译开放平台。
-/// 签名算法：MD5(appId + q + salt + secretKey)，拼到 GET 查询参数。
-/// 相比火山 V4 签名简单很多，无需 HMAC 链，也无需 X-Content-Sha256/Host 头。
-/// 请求地址：http://api.fanyi.baidu.com/api/trans/vip/translate
-/// 本类不依赖 RimWorld（无 Verse 引用），凭证通过构造函数注入，便于独立测试与复用。
+/// 百度翻译平台。签名：MD5(appId + q + salt + secretKey) 拼到 GET 参数；不依赖 RimWorld，凭证由构造函数注入。
 /// </summary>
-/// <remarks>
-/// 构造一个百度翻译平台实例。
-/// </remarks>
 /// <param name="appId">百度翻译 APP ID。</param>
 /// <param name="secretKey">百度翻译密钥。</param>
 public class BaiduTranslate(string appId, string secretKey) 
 : TranslatePlatform(appId ?? string.Empty, secretKey ?? string.Empty)
 {
-    /// <summary>平台标识键名（由调用方负责翻译为显示名，本类不引用 RimWorld 翻译机制）。public 供 AutoTranslatorStartup 反射读取，按 cred.PlatformId 匹配实例化。</summary>
+    /// <summary>平台标识键名，供 AutoTranslatorStartup 反射读取匹配实例化。</summary>
     public const string PlatformNameKey = "AutoTranslator.Baidu";
 
     private const string Endpoint = "http://api.fanyi.baidu.com/api/trans/vip/translate";
 
     private readonly Random _random = new();
 
-    /// <summary>百度可重试的临时故障码集合（限流/超时/系统繁忙等，重试可能恢复），命中这些码统一映射为 <see cref="TranslationErrorCode.RateLimited"/>。</summary>
+    /// <summary>可重试的临时故障码集合，命中映射为 RateLimited。</summary>
     private static readonly HashSet<string> RetryableErrorCodes =
     [
         "54003", // 访问频率受限
@@ -42,7 +35,7 @@ public class BaiduTranslate(string appId, string secretKey)
         "52003", // 未授权（服务端临时）→ 归为临时故障，重试可能恢复
     ];
 
-    /// <summary>百度翻译错误码 -> 中文描述（含处理建议）。依据百度翻译开放平台官方错误码表；52000 为成功，不在失败分支使用。</summary>
+    /// <summary>百度错误码 -> 中文描述（52000 为成功，不在失败分支使用）。</summary>
     private static readonly Dictionary<string, string> ErrorMessages = new()
     {
         { "52000", "成功" },
@@ -69,7 +62,7 @@ public class BaiduTranslate(string appId, string secretKey)
         { "20003", "请求内容存在安全风险，请检查文本是否涉及违规内容" },
     };
 
-    /// <summary>RimWorld 语言文件夹的英文名 -> 百度翻译语言码。百度支持语种有限，未列出的返回 null。代码依据百度官方语种列表（cht=繁体、sk=斯洛伐克、cat=加泰罗尼亚等）。</summary>
+    /// <summary>RimWorld 语言名 -> 百度语言码，未列出返回 null。</summary>
     private static readonly Dictionary<string, string> RimWorldToBaidu = new()
     {
         { "English", "en" },
@@ -106,13 +99,10 @@ public class BaiduTranslate(string appId, string secretKey)
         { "Vietnamese", "vie" },
     };
 
-    /// <summary>平台标识键名（由调用方负责翻译为显示名）。</summary>
+    /// <summary>平台标识键名。</summary>
     public override string PlatformName => PlatformNameKey;
 
-    /// <summary>
-    /// 将 RimWorld 语言文件夹名映射到百度翻译语言码。
-    /// 百度支持的语种有限，未知语言返回 null（由上层跳过）。
-    /// </summary>
+    /// <summary>RimWorld 语言名 -> 百度语言码，未知返回 null。</summary>
     public override string GetLangCode(string rimWorldLangName)
     {
         if (string.IsNullOrEmpty(rimWorldLangName))
@@ -125,9 +115,7 @@ public class BaiduTranslate(string appId, string secretKey)
         return code;
     }
 
-    /// <summary>
-    /// 具体翻译：from/to 已是百度平台语言码，text 为非空原文。
-    /// </summary>
+    /// <summary>核心翻译：from/to 为百度语言码，text 为非空原文。</summary>
     protected override TranslationResult TranslateCore(string from, string to, string text)
     {
         try
@@ -172,10 +160,7 @@ public class BaiduTranslate(string appId, string secretKey)
         }
     }
 
-    /// <summary>
-    /// 将百度平台业务错误码映射为统一错误码（<see cref="TranslationErrorCode"/>）。
-    /// 限流/超时/系统繁忙等瞬时故障 → RateLimited(1)；其余参数/语种/权限/余额类 → InvalidRequest(3)。
-    /// </summary>
+    /// <summary>百度业务错误码 -> 统一错误码（瞬时故障 RateLimited，其余 InvalidRequest）。</summary>
     private static TranslationErrorCode MapBaiduErrorCode(string code)
     {
         return RetryableErrorCodes.Contains(code)
@@ -183,9 +168,7 @@ public class BaiduTranslate(string appId, string secretKey)
             : TranslationErrorCode.InvalidRequest;
     }
 
-    /// <summary>
-    /// 发送 GET 请求并返回响应文本。
-    /// </summary>
+    /// <summary>发送 GET 请求并返回响应文本。</summary>
     private static string HttpGet(string url)
     {
         var request = (HttpWebRequest)WebRequest.Create(url);
@@ -196,10 +179,7 @@ public class BaiduTranslate(string appId, string secretKey)
         return reader.ReadToEnd();
     }
 
-    /// <summary>
-    /// 从百度响应 JSON 中提取译文：trans_result[0].dst。
-    /// 失败时返回 null。
-    /// </summary>
+    /// <summary>从响应 JSON 提取译文（trans_result[0].dst），失败返回 null。</summary>
     private static string ExtractTranslation(string response)
     {
         if (string.IsNullOrEmpty(response))
@@ -216,9 +196,7 @@ public class BaiduTranslate(string appId, string secretKey)
         return UnescapeJson(m.Groups[1].Value);
     }
 
-    /// <summary>
-    /// 计算 MD5 小写 32 位十六进制。
-    /// </summary>
+    /// <summary>计算 MD5 小写 32 位十六进制。</summary>
     private static string Md5Hex(string input)
     {
         using MD5 md5 = MD5.Create();
