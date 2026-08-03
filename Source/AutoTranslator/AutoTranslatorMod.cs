@@ -184,7 +184,7 @@ public class AutoTranslatorMod : Mod
         GameFont oldFont = Text.Font;
         TextAnchor oldAnchor = Text.Anchor;
         Text.Font = GameFont.Small;
-        Text.Anchor = TextAnchor.MiddleRight;
+        Text.Anchor = TextAnchor.MiddleLeft;
         try
         {
             Widgets.Label(labelRect, label);
