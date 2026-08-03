@@ -182,6 +182,6 @@ public class AutoTranslatorMod : Mod
         Rect labelRect = rect.LeftHalf().Rounded();
         Rect fieldRect = rect.RightHalf().Rounded();
         Widgets.Label(labelRect, label);
-        return GUI.PasswordField(fieldRect, realValue, '*');
+        return GUI.PasswordField(fieldRect, realValue, '*', Text.CurTextFieldStyle);
     }
 }
