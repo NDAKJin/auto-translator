@@ -11,7 +11,7 @@ namespace nomadicooer.AutoTranslator;
 /// 自动翻译引擎：统一管理翻译源（启用的平台凭据）、按需翻译，
 /// 把官方未翻译的 key 提交翻译并回写到 keyedReplacements / auto.xml。
 /// 落盘统一走 AutoTranslationStore，日志统一走 AutoLog。
-/// 翻译在后台线程池（Task.Run）执行，不阻塞 UI；后台异常不吞，统一抛回主线程输出完整堆栈。
+/// 翻译由一条专属后台线程串行执行（不用线程池），不阻塞 UI；异常不吞，统一抛回主线程输出完整堆栈。
 /// </summary>
 public static class AutoTranslatorEngine
 {
@@ -166,10 +166,9 @@ public static class AutoTranslatorEngine
     }
 
     /// <summary>
-    /// 后台执行一段翻译工作：投递到专属单工作线程的队列，串行执行。
-    /// 绝不使用线程池（Task.Run）：翻译是同步阻塞 HTTP，一个界面可能瞬间冒出几十个 key，
-    /// 每 key 一个线程池任务会占满 Mono 线程池，导致游戏自身拿不到工作线程而整体卡死。
-    /// 异常不吞，捕获后转交主线程输出完整堆栈。
+    /// 提交一段翻译工作到队列，由那一条后台线程串行执行。
+    /// 翻译是同步阻塞 HTTP，一个界面可能瞬间冒出几十个 key，因此只用自己的一条线程排队做，
+    /// 不去抢游戏的线程资源。异常不吞，捕获后转交主线程输出完整堆栈。
     /// </summary>
     private static void RunInBackground(string context, Action work)
     {
@@ -243,7 +242,7 @@ public static class AutoTranslatorEngine
         });
     }
 
-    /// <summary>提交一条翻译请求（主线程拦截时调用）。后台 Task.Run 执行，不阻塞主线程。</summary>
+    /// <summary>提交一条翻译请求（主线程拦截时调用）：投入队列由后台线程执行，不阻塞主线程。</summary>
     public static void RequestTranslate(string key, string text)
     {
         if (!configured || Dispatcher == null || Dispatcher.Count == 0)
