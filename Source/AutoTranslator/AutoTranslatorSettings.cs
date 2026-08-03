@@ -76,16 +76,30 @@ public class PlatformCredential : IExposable
     /// <summary>平台标志（PlatformNameKey，如 "AutoTranslator.Baidu"），同时作为引擎匹配的 PlatformId。</summary>
     public string PlatformId;
 
-    /// <summary>访问标识 / APP ID（百度为 appId，阿里为 AccessKeyId，火山为 AccessKey）。</summary>
-    public string AccessKey;
+    /// <summary>存档用混淆串（仅落盘，代码不直接读）。</summary>
+    private string accessKeyObf;
 
-    /// <summary>访问密钥 / SecretKey。</summary>
-    public string SecretKey;
+    /// <summary>存档用混淆串（仅落盘，代码不直接读）。</summary>
+    private string secretKeyObf;
+
+    /// <summary>访问标识 / APP ID（百度为 appId，阿里为 AccessKeyId，火山为 AccessKey）。对外明文，内部混淆存储。</summary>
+    public string AccessKey
+    {
+        get => Obfuscation.Decode(accessKeyObf);
+        set => accessKeyObf = Obfuscation.Encode(value);
+    }
+
+    /// <summary>访问密钥 / SecretKey。对外明文，内部混淆存储。</summary>
+    public string SecretKey
+    {
+        get => Obfuscation.Decode(secretKeyObf);
+        set => secretKeyObf = Obfuscation.Encode(value);
+    }
 
     public void ExposeData()
     {
         Scribe_Values.Look(ref PlatformId, "platformId");
-        Scribe_Values.Look(ref AccessKey, "accessKey");
-        Scribe_Values.Look(ref SecretKey, "secretKey");
+        Scribe_Values.Look(ref accessKeyObf, "accessKey");
+        Scribe_Values.Look(ref secretKeyObf, "secretKey");
     }
 }
