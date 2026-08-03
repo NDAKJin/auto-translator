@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -44,6 +45,9 @@ public class AutoTranslatorMod : Mod
         const float ViewHeight = 720f;
         Rect outRect = inRect;
         Rect viewRect = new Rect(0f, 0f, inRect.width - ScrollBarMargin, ViewHeight);
+
+        // 确保所有已注册平台都有凭据对象（升级旧存档/新增平台时补齐），再读取勾选状态。
+        settings.EnsureAllPlatforms();
 
         // 先收集用户在平台列表上的勾选状态，避免 listing 渲染期间增删 Credentials 触发控件错乱。
         var platformChecks = new Dictionary<string, bool>();
@@ -94,7 +98,7 @@ public class AutoTranslatorMod : Mod
             DrawCollapsibleHeader(listing, TranslateKeys.CredentialTable.Translate());
             if (!settings.credentialsCollapsed)
             {
-                foreach (PlatformCredential cred in settings.credentials)
+                foreach (PlatformCredential cred in settings.credentials.Where(c => c.enabled))
                 {
                     listing.Gap(8f);
                     string platformLabel = PlatformRegistry.LabelKeys.TryGetValue(cred.PlatformId, out string key)

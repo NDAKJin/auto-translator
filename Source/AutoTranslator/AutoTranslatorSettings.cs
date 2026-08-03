@@ -34,28 +34,47 @@ public class AutoTranslatorSettings : ModSettings
         }
     }
 
-    /// <summary>是否已启用某平台（存在对应凭据）。</summary>
+    /// <summary>某平台是否已启用。</summary>
     public bool HasPlatform(string platformId) =>
-        credentials.Any(c => c.PlatformId == platformId);
+        credentials.FirstOrDefault(c => c.PlatformId == platformId)?.enabled ?? false;
 
-    /// <summary>启用某平台：若尚无凭据则补一条空凭据。</summary>
+    /// <summary>启用某平台：补齐凭据（若不存在），并标记为启用。</summary>
     public void EnablePlatform(string platformId)
     {
-        if (!HasPlatform(platformId))
+        PlatformCredential cred = credentials.FirstOrDefault(c => c.PlatformId == platformId);
+        if (cred == null)
         {
-            credentials.Add(new PlatformCredential { PlatformId = platformId });
+            cred = new PlatformCredential { PlatformId = platformId };
+            credentials.Add(cred);
         }
+        cred.enabled = true;
     }
 
-    /// <summary>禁用某平台：移除其凭据。</summary>
+    /// <summary>禁用某平台：仅标记为禁用，保留凭据数据，避免再勾选时密钥丢失。</summary>
     public void DisablePlatform(string platformId)
     {
-        credentials.RemoveAll(c => c.PlatformId == platformId);
+        PlatformCredential cred = credentials.FirstOrDefault(c => c.PlatformId == platformId);
+        if (cred != null)
+        {
+            cred.enabled = false;
+        }
     }
 
     /// <summary>获取某平台凭据，不存在返回 null。</summary>
     public PlatformCredential GetCredential(string platformId) =>
         credentials.FirstOrDefault(c => c.PlatformId == platformId);
+
+    /// <summary>确保所有已注册平台都有凭据对象（用于升级旧存档或新增平台时补齐）。</summary>
+    public void EnsureAllPlatforms()
+    {
+        foreach (string platformId in PlatformRegistry.PlatformTypes.Keys)
+        {
+            if (credentials.All(c => c.PlatformId != platformId))
+            {
+                credentials.Add(new PlatformCredential { PlatformId = platformId, enabled = false });
+            }
+        }
+    }
 
     /// <summary>恢复默认：清空凭据与所有开关。</summary>
     public void ResetToDefaults()
@@ -78,6 +97,9 @@ public class PlatformCredential : IExposable
 {
     /// <summary>平台标志（PlatformNameKey，如 "AutoTranslator.Baidu"），同时作为引擎匹配的 PlatformId。</summary>
     public string PlatformId;
+
+    /// <summary>该平台是否启用。取消勾选仅改此标记，不删除凭据，避免再勾选时密钥丢失。</summary>
+    public bool enabled = true;
 
     /// <summary>存档用混淆串（仅落盘，代码不直接读）。</summary>
     private string accessKeyObf;
@@ -108,6 +130,7 @@ public class PlatformCredential : IExposable
     public void ExposeData()
     {
         Scribe_Values.Look(ref PlatformId, "platformId");
+        Scribe_Values.Look(ref enabled, "enabled", true);
         Scribe_Values.Look(ref accessKeyObf, "accessKey");
         Scribe_Values.Look(ref secretKeyObf, "secretKey");
     }

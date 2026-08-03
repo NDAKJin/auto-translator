@@ -35,7 +35,7 @@ public static class AutoTranslatorEngine
         var dispatcher = new TranslationDispatcher();
         foreach (PlatformCredential cred in AutoTranslatorMod.Settings.credentials)
         {
-            if (string.IsNullOrEmpty(cred.PlatformId))
+            if (string.IsNullOrEmpty(cred.PlatformId) || !cred.enabled)
             {
                 continue;
             }
