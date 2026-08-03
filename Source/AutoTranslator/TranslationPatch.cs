@@ -13,27 +13,39 @@ namespace nomadicooer.AutoTranslator;
 [HarmonyPatch(typeof(Translator), nameof(Translator.TryTranslate))]
 internal static class TranslationPatch
 {
-    /// <summary>官方翻译失败时（out 结果回退为 key 或为空）触发记录与回写。</summary>
-    private static void Postfix(string key, ref TaggedString __result)
+    /// <summary>官方翻译失败时（__resultReturn == false）触发记录与回写。</summary>
+    /// <param name="__resultReturn">官方 TryTranslate 的返回值：true=官方已处理（命中或异常短路），false=官方无该 key 译文。</param>
+    private static void Postfix(string key, ref TaggedString __result, ref bool __resultReturn)
     {
         // 总开关关闭则不拦截。
         if (!AutoTranslatorMod.AutoTranslateEnabled)
         {
             return;
         }
-        // 官方翻译成功（拿到了非 key 的译文）不处理。
-        if (!__result.NullOrEmpty() && __result != key)
+        // 老版逻辑：信任官方返回值。官方已处理（包括 activeLanguage==null 的异常短路、命中等）不接手。
+        if (__resultReturn)
+        {
+            return;
+        }
+        // 老版逻辑：key 为空无意义，直接跳过。
+        if (key == null)
+        {
+            return;
+        }
+        // 老版逻辑：激活语言就是默认语言（English）时无需翻译/记录。
+        if (LanguageDatabase.activeLanguage == null
+            || LanguageDatabase.activeLanguage == LanguageDatabase.defaultLanguage)
         {
             return;
         }
 
-        // 原文取英文基准（默认语言包）；无英文基准则回退为 key 本身。
-        string source = key;
-        if (LanguageDatabase.defaultLanguage != null
-            && LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out TaggedString english))
+        // 原文必须取自默认语言包（英文基准）；取不到则直接打回，不记录无基准的 key。
+        if (LanguageDatabase.defaultLanguage == null
+            || !LanguageDatabase.defaultLanguage.TryGetTextFromKey(key, out TaggedString english))
         {
-            source = english;
+            return;
         }
+        string source = english;
 
         // 记录 key 与原文（受 enableTranslationLog 开关，Store 内部 Writable 控制是否落盘）。
         AutoTranslationStore.RecordSource(key, source);
