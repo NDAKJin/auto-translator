@@ -219,12 +219,25 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>定时器回调：有 dirty 才落盘，避免无写入时写空盘。</summary>
+  /// <summary>定时器回调：有 dirty 才落盘；连续无写入时自杀——停掉并释放定时器、复位 timerStarted，
+  /// 让下次写入口能重新懒启动，避免空闲时一直占用线程池空转。</summary>
   private static void FlushIfDirty()
   {
     if (dirtyCount > 0)
     {
       Flush();
+      return;
+    }
+    // 无脏数据：停掉自身定时器（自杀），复位标志以便重新懒启动
+    lock (startLock)
+    {
+      if (timerStarted)
+      {
+        flushTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        flushTimer?.Dispose();
+        flushTimer = null;
+        timerStarted = false;
+      }
     }
   }
 
