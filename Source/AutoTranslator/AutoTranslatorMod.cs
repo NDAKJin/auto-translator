@@ -37,9 +37,6 @@ public class AutoTranslatorMod : Mod
     /// <summary>设置页滚动视图的纵向位移状态（跨帧保留）。</summary>
     private Vector2 settingsScrollPos;
 
-    /// <summary>凭据密码框是否显示明文（眼睛按钮切换）。</summary>
-    private bool showPasswords;
-
     public override void DoSettingsWindowContents(Rect inRect)
     {
         const float ScrollBarMargin = 16f;
@@ -104,33 +101,29 @@ public class AutoTranslatorMod : Mod
                         : cred.PlatformId;
                     listing.Label(platformLabel);
 
-                    // 访问键：真实值存 cred.AccessKey（label 字段，隐藏），输入框用密码框打码，改后同步写回。
+                    // 访问键：真实值存 cred.AccessKey（label 字段，隐藏），输入框打码/明文可切换，改后同步写回。
                     cred.AccessKey = DrawPasswordField(
-                        listing, platformLabel + " · " + TranslateKeys.AccessKey.Translate(), cred.AccessKey, showPasswords);
+                        listing, platformLabel + " · " + TranslateKeys.AccessKey.Translate(), cred.AccessKey, ref cred.showAccessKey);
 
                     // 密钥：同上
                     cred.SecretKey = DrawPasswordField(
-                        listing, platformLabel + " · " + TranslateKeys.SecretKey.Translate(), cred.SecretKey, showPasswords);
+                        listing, platformLabel + " · " + TranslateKeys.SecretKey.Translate(), cred.SecretKey, ref cred.showSecretKey);
                 }
             }
 
-            // 保存设置 / 恢复默认：两个按钮居中并排，右侧加眼睛切换密码显示。
+            // 保存设置 / 恢复默认：两个按钮居中并排。
             // 保存设置：明确写盘并刷新引擎（明确保存后才持久化）。
             // 恢复默认：立即重置内存，但需点保存才落盘。
             listing.Gap(12f);
             const float BottomButtonHeight = 28f;
-            const float EyeButtonSize = 28f;
-            const float EyeSpacing = 4f;
+            const float ButtonSpacing = 4f;
             const float CenterButtonWidth = 140f;
             Rect bottomRow = listing.GetRect(BottomButtonHeight);
-            // 眼睛贴右；两个按钮在去掉眼睛后的剩余空间内居中。
-            float availableWidth = bottomRow.width - EyeButtonSize - EyeSpacing;
-            float btnW = Mathf.Min(CenterButtonWidth, (availableWidth - EyeSpacing) / 2f);
-            float centerGroupW = btnW * 2f + EyeSpacing;
-            float centerX = bottomRow.x + (availableWidth - centerGroupW) / 2f;
+            float btnW = Mathf.Min(CenterButtonWidth, (bottomRow.width - ButtonSpacing) / 2f);
+            float centerGroupW = btnW * 2f + ButtonSpacing;
+            float centerX = bottomRow.x + (bottomRow.width - centerGroupW) / 2f;
             Rect saveRect = new Rect(centerX, bottomRow.y, btnW, bottomRow.height).Rounded();
-            Rect resetRect = new Rect(centerX + btnW + EyeSpacing, bottomRow.y, btnW, bottomRow.height).Rounded();
-            Rect eyeRect = new Rect(bottomRow.xMax - EyeButtonSize, bottomRow.y, EyeButtonSize, bottomRow.height).Rounded();
+            Rect resetRect = new Rect(centerX + btnW + ButtonSpacing, bottomRow.y, btnW, bottomRow.height).Rounded();
             if (Widgets.ButtonText(saveRect, TranslateKeys.SaveSettings.Translate()))
             {
                 WriteSettings();
@@ -141,11 +134,6 @@ public class AutoTranslatorMod : Mod
             {
                 settings.ResetToDefaults();
             }
-            if (Widgets.ButtonImage(eyeRect, TexButton.Reveal))
-            {
-                showPasswords = !showPasswords;
-            }
-            TooltipHandler.TipRegion(eyeRect, (showPasswords ? TranslateKeys.HidePassword : TranslateKeys.ShowPassword).Translate());
 
             listing.End();
             Widgets.EndScrollView();
@@ -196,20 +184,24 @@ public class AutoTranslatorMod : Mod
     }
 
     /// <summary>
-    /// 密码框封装（仿 TextEntryLabeled）：label 紧凑靠左 + 输入框填充剩余空间延伸到行尾。
+    /// 密码框封装：固定宽度 label 右对齐 + 输入框填充到眼睛按钮前 + 每行右侧眼睛按钮切换显示/隐藏。
     /// 真实值存于 realValue（调用方持有的 label 字段，隐藏）；输入框全 * 打码或明文显示，用户改动后返回真实输入同步写回。
     /// </summary>
-    private string DrawPasswordField(Listing_Standard listing, string label, string realValue, bool showPassword)
+    private string DrawPasswordField(Listing_Standard listing, string label, string realValue, ref bool showPassword)
     {
+        const float LabelWidth = 150f;
+        const float EyeButtonWidth = 24f;
+        const float FieldSpacing = 6f;
+
         Rect rect = listing.GetRect(Text.LineHeight);
         GameFont oldFont = Text.Font;
         TextAnchor oldAnchor = Text.Anchor;
         Text.Font = GameFont.Small;
-        Text.Anchor = TextAnchor.MiddleLeft;
-        // label 紧凑宽度（按文本计算，最多占半行），输入框从 label 右侧一直延伸到行尾。
-        float labelWidth = Mathf.Min(Text.CalcSize(label).x + 8f, rect.width * 0.5f);
-        Rect labelRect = new Rect(rect.x, rect.y, labelWidth, rect.height).Rounded();
-        Rect fieldRect = new Rect(rect.x + labelWidth, rect.y, rect.width - labelWidth, rect.height).Rounded();
+        Text.Anchor = TextAnchor.MiddleRight;
+
+        Rect labelRect = new Rect(rect.x, rect.y, LabelWidth, rect.height).Rounded();
+        Rect eyeRect = new Rect(rect.xMax - EyeButtonWidth, rect.y, EyeButtonWidth, rect.height).Rounded();
+        Rect fieldRect = new Rect(rect.x + LabelWidth + FieldSpacing, rect.y, rect.width - LabelWidth - EyeButtonWidth - FieldSpacing * 2f, rect.height).Rounded();
         try
         {
             Widgets.Label(labelRect, label);
@@ -219,6 +211,13 @@ public class AutoTranslatorMod : Mod
             Text.Font = oldFont;
             Text.Anchor = oldAnchor;
         }
+
+        if (Widgets.ButtonImage(eyeRect, TexButton.Reveal))
+        {
+            showPassword = !showPassword;
+        }
+        TooltipHandler.TipRegion(eyeRect, (showPassword ? TranslateKeys.HidePassword : TranslateKeys.ShowPassword).Translate());
+
         string safeValue = realValue ?? string.Empty;
         return showPassword
             ? GUI.TextField(fieldRect, safeValue, Text.CurTextFieldStyle)

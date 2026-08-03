@@ -85,6 +85,12 @@ public class PlatformCredential : IExposable
     /// <summary>存档用混淆串（仅落盘，代码不直接读）。</summary>
     private string secretKeyObf;
 
+    /// <summary>访问键输入框是否显示明文（运行时临时状态，不落盘）。</summary>
+    public bool showAccessKey;
+
+    /// <summary>密钥输入框是否显示明文（运行时临时状态，不落盘）。</summary>
+    public bool showSecretKey;
+
     /// <summary>访问标识 / APP ID（百度为 appId，阿里为 AccessKeyId，火山为 AccessKey）。对外明文，内部混淆存储。</summary>
     public string AccessKey
     {
