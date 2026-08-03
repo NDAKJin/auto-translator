@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using RimWorld;
 using UnityEngine;
 using Verse;
+using Verse.Sound;
 
 namespace nomadicooer.AutoTranslator;
 
@@ -129,10 +130,12 @@ public class AutoTranslatorMod : Mod
                 WriteSettings();
                 // 写盘后刷新引擎翻译源：补填/修改凭据立即生效，无需重启游戏。
                 AutoTranslatorEngine.RefreshSources();
+                SoundDefOf.Tick_High.PlayOneShot(SoundInfo.OnCamera(MaintenanceType.None));
             }
             if (Widgets.ButtonText(resetRect, TranslateKeys.ResetDefaults.Translate()))
             {
                 settings.ResetToDefaults();
+                SoundDefOf.Tick_Low.PlayOneShot(SoundInfo.OnCamera(MaintenanceType.None));
             }
 
             listing.End();
