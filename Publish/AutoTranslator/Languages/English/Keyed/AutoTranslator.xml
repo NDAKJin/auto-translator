@@ -23,7 +23,4 @@
   <AutoTranslator.SecretKey>Secret key</AutoTranslator.SecretKey>
   <AutoTranslator.ResetDefaults>Reset to defaults</AutoTranslator.ResetDefaults>
   <AutoTranslator.TranslateAll>Translate all</AutoTranslator.TranslateAll>
-  <AutoTranslator.Baidu>Baidu Translate</AutoTranslator.Baidu>
-  <AutoTranslator.Aliyun>Aliyun Translate</AutoTranslator.Aliyun>
-  <AutoTranslator.Volcengine>Volcengine Translate</AutoTranslator.Volcengine>
 </LanguageData>
