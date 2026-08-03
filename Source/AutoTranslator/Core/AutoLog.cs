@@ -1,10 +1,17 @@
 using System;
+using System.Diagnostics;
 using System.IO;
+
+// 仅在 RimWorld 工程编译时引入 Verse，测试工程不定义 RIMWORLD，自动降级且不依赖 Assembly-CSharp。
+#if RIMWORLD
 using Verse;
+#endif
 
 namespace nomadicooer.AutoTranslator;
 
-/// <summary>统一日志层：集中所有日志出口，分级 + 全局/调试开关 + 可选纯文本文件出口。</summary>
+/// <summary>统一日志层：集中所有日志出口，分级 + 全局/调试开关 + 可选纯文本文件出口。
+/// 内部对 Verse.Log 的依赖仅在 RIMWORLD 编译符号下生效，否则降级到 Debug.WriteLine，
+/// 使翻译层在测试工程中无需引用 Assembly-CSharp 即可独立编译。</summary>
 public static class AutoLog
 {
   /// <summary>全局开关：false 时所有日志均不输出。默认 true。</summary>
@@ -19,7 +26,8 @@ public static class AutoLog
   /// <summary>异常摘要开关：true 只输出「类型: 消息」，false 输出完整堆栈。默认 true。</summary>
   public static bool CompactException { get; set; } = true;
 
-  private static string Prefix => $"[{AutoTranslatorGlobals.ModId}] ";
+  // 不依赖 AutoTranslatorGlobals（其依赖 Verse），避免测试工程编译时引入 Verse。
+  private static string Prefix => "[nomadicooer.AutoTranslator] ";
 
   /// <summary>异常描述：按 CompactException 决定输出摘要或全堆栈。</summary>
   private static string Describe(Exception ex)
@@ -45,13 +53,18 @@ public static class AutoLog
   /// <summary>日志时间戳（文件出口用）。</summary>
   private static string Now => DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff");
 
-  /// <summary>纯文本日志文件完整路径（mod 包目录/Logs/autotranslator.log）。</summary>
+  /// <summary>纯文本日志文件完整路径（mod 包目录/Logs/autotranslator.log）。仅 RIMWORLD 下可用。</summary>
+#if RIMWORLD
   private static string LogFilePath =>
     Path.Combine(AutoTranslatorGlobals.ModRootDir, AutoTranslatorGlobals.LogDirName, AutoTranslatorGlobals.LogFileName);
+#else
+  private static string LogFilePath => null;
+#endif
 
   /// <summary>追加一行到日志文件，失败静默忽略（不影响主流程、不回写日志）。</summary>
   private static void AppendToFile(string line)
   {
+#if RIMWORLD
     try
     {
       var path = LogFilePath;
@@ -65,6 +78,31 @@ public static class AutoLog
     catch (Exception)
     {
     }
+#endif
+  }
+
+  /// <summary>统一出口：RIMWORLD 下走 Verse.Log，否则降级 Debug.WriteLine。</summary>
+  private static void Emit(string level, string full, bool once)
+  {
+#if RIMWORLD
+    if (level == "Warn")
+    {
+      if (once) Log.WarningOnce(full, full.GetHashCode());
+      else Log.Warning(full);
+    }
+    else if (level == "Error")
+    {
+      if (once) Log.ErrorOnce(full, full.GetHashCode());
+      else Log.Error(full);
+    }
+    else
+    {
+      Log.Message(full);
+    }
+#else
+    if (once) Debug.WriteLine($"[{level}] {full}");
+    else Debug.WriteLine($"[{level}] {full}");
+#endif
   }
 
   /// <summary>调试级：开发期排错，受 DebugEnabled 控制。</summary>
@@ -75,7 +113,7 @@ public static class AutoLog
       return;
     }
     var full = Prefix + text;
-    Log.Message(full);
+    Emit("Info", full, false);
     if (EnabledToFile)
     {
       AppendToFile($"[{Now}] DEBUG {full}");
@@ -90,7 +128,7 @@ public static class AutoLog
       return;
     }
     var full = Prefix + text;
-    Log.Message(full);
+    Emit("Info", full, false);
     if (EnabledToFile)
     {
       AppendToFile($"[{Now}] INFO {full}");
@@ -105,7 +143,7 @@ public static class AutoLog
       return;
     }
     var full = Prefix + text;
-    Log.Warning(full);
+    Emit("Warn", full, false);
     if (EnabledToFile)
     {
       AppendToFile($"[{Now}] WARN {full}");
@@ -130,7 +168,7 @@ public static class AutoLog
       return;
     }
     var full = Prefix + text;
-    Log.WarningOnce(full, text.GetHashCode());
+    Emit("Warn", full, true);
     if (EnabledToFile)
     {
       AppendToFile($"[{Now}] WARN {full}");
@@ -145,7 +183,7 @@ public static class AutoLog
       return;
     }
     var full = Prefix + text;
-    Log.Error(full);
+    Emit("Error", full, false);
     if (EnabledToFile)
     {
       AppendToFile($"[{Now}] ERROR {full}");
@@ -170,7 +208,7 @@ public static class AutoLog
       return;
     }
     var full = Prefix + text;
-    Log.ErrorOnce(full, text.GetHashCode());
+    Emit("Error", full, true);
     if (EnabledToFile)
     {
       AppendToFile($"[{Now}] ERROR {full}");

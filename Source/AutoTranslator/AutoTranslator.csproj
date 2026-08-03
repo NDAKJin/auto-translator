@@ -10,6 +10,9 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <EnableDefaultItems>true</EnableDefaultItems>
+    <!-- RIMWORLD：标识编译目标为 RimWorld 游戏环境，AutoLog 等据此启用 Verse.Log 依赖。
+         测试工程不定义此符号，自动降级且无 Verse 依赖。 -->
+    <DefineConstants>$(DefineConstants);RIMWORLD</DefineConstants>
     <!-- 输出到 Publish\AutoTranslator\1.6\Assemblies（相对 Source 目录） -->
     <OutputPath>..\..\Publish\AutoTranslator\1.6\Assemblies\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

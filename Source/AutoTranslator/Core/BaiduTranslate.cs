@@ -82,7 +82,7 @@ public class BaiduTranslate : TranslatePlatform
             {
                 TranslationErrorCode code = MapBaiduErrorCode(platformCode);
                 string err = "百度翻译错误 " + platformCode + ": " + DescribeError(ErrorMessages, platformCode);
-                ApiLog.Debug("[AutoTranslator] " + err
+                AutoLog.Warn("[AutoTranslator] " + err
                                 + "，原始信息: " + ExtractField(response, "error_msg"));
                 return TranslationResult.Fail(text, code, err);
             }
@@ -90,7 +90,7 @@ public class BaiduTranslate : TranslatePlatform
             string translated = ExtractTranslation(response);
             if (string.IsNullOrEmpty(translated))
             {
-                ApiLog.Debug("[AutoTranslator] 百度翻译响应中未找到译文");
+                AutoLog.Warn("[AutoTranslator] 百度翻译响应中未找到译文");
                 return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "百度翻译响应中未找到译文");
             }
 
@@ -98,7 +98,7 @@ public class BaiduTranslate : TranslatePlatform
         }
         catch (Exception ex)
         {
-            ApiLog.Debug("[AutoTranslator] 百度翻译请求失败: " + ex.Message);
+            AutoLog.Warn("[AutoTranslator] 百度翻译请求失败: " + ex.Message);
             return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "百度翻译请求失败: " + ex.Message);
         }
     }

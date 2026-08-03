@@ -77,7 +77,7 @@ public class AliyunTranslate : TranslatePlatform
             {
                 TranslationErrorCode code = MapAliyunErrorCode(platformCode);
                 string err = "阿里云翻译错误 " + platformCode + ": " + DescribeError(ErrorMessages, platformCode);
-                ApiLog.Debug("[AutoTranslator] " + err
+                AutoLog.Warn("[AutoTranslator] " + err
                                 + "，原始信息: " + ExtractField(response, "Message"));
                 return TranslationResult.Fail(text, code, err);
             }
@@ -85,7 +85,7 @@ public class AliyunTranslate : TranslatePlatform
             string translated = ExtractTranslation(response);
             if (string.IsNullOrEmpty(translated))
             {
-                ApiLog.Debug("[AutoTranslator] 阿里云翻译响应中未找到译文");
+                AutoLog.Warn("[AutoTranslator] 阿里云翻译响应中未找到译文");
                 return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "阿里云翻译响应中未找到译文");
             }
 
@@ -93,7 +93,7 @@ public class AliyunTranslate : TranslatePlatform
         }
         catch (Exception ex)
         {
-            ApiLog.Debug("[AutoTranslator] 阿里云翻译请求失败: " + ex.Message);
+            AutoLog.Warn("[AutoTranslator] 阿里云翻译请求失败: " + ex.Message);
             return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "阿里云翻译请求失败: " + ex.Message);
         }
     }
@@ -196,7 +196,7 @@ public class AliyunTranslate : TranslatePlatform
             {
                 using var errReader = new StreamReader(errResp.GetResponseStream(), Encoding.GetEncoding("utf-8"));
                 string errBody = errReader.ReadToEnd();
-                ApiLog.Debug("[AutoTranslator] 阿里云错误响应(" + (int)errResp.StatusCode + "): " + errBody);
+                AutoLog.Warn("[AutoTranslator] 阿里云错误响应(" + (int)errResp.StatusCode + "): " + errBody);
                 return errBody;
             }
 

@@ -72,7 +72,7 @@ public abstract class TranslatePlatform : ITranslationPlatform
     /// <summary>记录失败日志并返回失败结果（译文回退为原文 text）。</summary>
     protected static TranslationResult FailLog(string message, TranslationErrorCode code, string rawError)
     {
-        ApiLog.Debug(message);
+        AutoLog.Warn(message);
         return TranslationResult.Fail(string.Empty, code, rawError ?? message);
     }
 

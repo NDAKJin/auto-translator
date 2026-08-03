@@ -117,14 +117,14 @@ public class VolcengineTranslate : TranslatePlatform
                 TranslationErrorCode code = MapVolcErrorCode(platformCode);
                 string err = "火山翻译错误 " + platformCode + ": " + DescribeError(ErrorMessages, platformCode)
                               + "（" + ExtractField(response, "Message") + "）";
-                ApiLog.Debug("[AutoTranslator] " + err);
+                AutoLog.Warn("[AutoTranslator] " + err);
                 return TranslationResult.Fail(text, code, err);
             }
 
             string translated = ExtractTranslation(response);
             if (string.IsNullOrEmpty(translated))
             {
-                ApiLog.Debug("[AutoTranslator] 火山翻译响应中未找到译文");
+                AutoLog.Warn("[AutoTranslator] 火山翻译响应中未找到译文");
                 return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译响应中未找到译文");
             }
 
@@ -132,7 +132,7 @@ public class VolcengineTranslate : TranslatePlatform
         }
         catch (Exception ex)
         {
-            ApiLog.Debug("[AutoTranslator] 火山翻译请求失败: " + ex.Message);
+            AutoLog.Warn("[AutoTranslator] 火山翻译请求失败: " + ex.Message);
             return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "火山翻译请求失败: " + ex.Message);
         }
     }

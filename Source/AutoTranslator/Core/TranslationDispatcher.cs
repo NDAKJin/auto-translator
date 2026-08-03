@@ -117,7 +117,7 @@ public class TranslationDispatcher : ITranslationPlatform
     {
         if (_sources.Count == 0)
         {
-            ApiLog.Debug("[AutoTranslator] 翻译调度器无可用翻译源，返回原文。");
+            AutoLog.Error("[AutoTranslator] 翻译调度器未注册任何翻译源，无法执行翻译。请检查 Mod 设置中是否已启用并正确配置至少一个翻译源（如火山/阿里云/百度）的 API Key。");
             return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "翻译调度器无可用翻译源");
         }
 
@@ -138,7 +138,7 @@ public class TranslationDispatcher : ITranslationPlatform
 
             if (IsInCooldown(platform))
             {
-                ApiLog.Debug("[AutoTranslator] 翻译源 " + platform.PlatformName + " 处于关禁闭期，跳过。");
+                AutoLog.Warn("[AutoTranslator] 翻译源 " + platform.PlatformName + " 处于关禁闭期，跳过。");
                 continue;
             }
 
@@ -169,7 +169,7 @@ public class TranslationDispatcher : ITranslationPlatform
         {
             retry++;
             int backoff = BaseBackoffMs * (1 << (retry - 1));
-            ApiLog.Debug("[AutoTranslator] 翻译源 " + platform.PlatformName
+            AutoLog.Warn("[AutoTranslator] 翻译源 " + platform.PlatformName
                             + " 限流，第 " + retry + " 次重试，等待 " + backoff + "ms。");
             Thread.Sleep(backoff);
             result = platform.Translate(source, target, text);
@@ -217,7 +217,7 @@ public class TranslationDispatcher : ITranslationPlatform
             if (count > DisableThreshold)
             {
                 _cooldownUntil[platform] = DateTime.UtcNow.Ticks + CooldownMs * TimeSpan.TicksPerMillisecond;
-                ApiLog.Debug("[AutoTranslator] 翻译源 " + platform.PlatformName
+                AutoLog.Warn("[AutoTranslator] 翻译源 " + platform.PlatformName
                                 + " 连续失败 " + count + " 次，关禁闭 " + CooldownMs + "ms。");
             }
         }
