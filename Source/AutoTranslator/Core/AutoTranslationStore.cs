@@ -54,49 +54,75 @@ public static class AutoTranslationStore
   /// <summary>记录一条翻译（写入口）：两阶段 —— 先存源文(text=原文, translated=false)，翻译后存译文(text=译文, translated=true)。
   /// 源文/译文分两次调用、每次只传一个 text，按 key 合并：translated=false 填 Source 槽，translated=true 填 Translation 槽；
   /// 译文为空回退为源文；translated 取 OR（终态 true 不被后到 false 覆盖）。translated 默认 false（源文阶段）。</summary>
-  public static void Record(string key, string text, bool translated = false)
+  /// <summary>写入口一：记录源文（原文）。原文缺失（source 为空）不入库；原文不得用 key 顶替。
+  /// 无该 key 时新建（译文回退为原文、Translated=false）；已有则仅在原文本空时补源文。</summary>
+  public static void RecordSource(string key, string source)
   {
-    EnsureTimerStarted();
-    if (!Writable || key == null)
+    if (key == null || string.IsNullOrEmpty(source))
     {
       return;
     }
-    // DevMode 下游戏会对未译原文套变音符号作伪本地化回退，此类伪文本仅调试期占位、
-    // 无翻译价值，且只可能出现在 DevMode；跳过记录避免污染 auto.xml 源文。
-    if (Prefs.DevMode)
+    if (!Writable || Prefs.DevMode)
     {
       return;
     }
     TryLoad();
-    bool needFlush;
+    Mutate(key, existing =>
+    {
+      // 已有源文则沿用，不覆盖；原文缺失才补
+      string mergedSource = string.IsNullOrEmpty(existing?.Source) ? source : existing.Source;
+      string mergedTranslation = existing?.Translation;
+      if (string.IsNullOrEmpty(mergedTranslation))
+      {
+        mergedTranslation = mergedSource;
+      }
+      bool mergedTranslated = existing?.Translated ?? false;
+      return new TranslationEntry(key, mergedSource, mergedTranslation, mergedTranslated);
+    });
+  }
+
+  /// <summary>写入口二：记录译文。必须先有原文（之前未存入原文的打回不入库）；
+  /// 译文为空不入库。Translated 置 true。</summary>
+  public static void RecordTranslation(string key, string translation)
+  {
+    if (key == null || string.IsNullOrEmpty(translation))
+    {
+      return;
+    }
+    if (!Writable || Prefs.DevMode)
+    {
+      return;
+    }
+    TryLoad();
+    Mutate(key, existing =>
+    {
+      // 译文阶段必须先有原文：无 existing 或其 Source 为空则打回
+      if (existing == null || string.IsNullOrEmpty(existing.Source))
+      {
+        return null;
+      }
+      return new TranslationEntry(key, existing.Source, translation, true);
+    });
+  }
+
+  /// <summary>带锁执行一次合并：从 store 取 existing，调用 merge 生成新条目；
+  /// merge 返回 null 表示打回（不入库）；与现有相等则跳过；否则写入并累计 dirty 触发落盘。
+  /// 人工已校验/改过的条目（Verified=true）自动路径整体跳过，保留人工成果。</summary>
+  private static void Mutate(string key, Func<TranslationEntry, TranslationEntry> merge)
+  {
+    bool needFlush = false;
     lock (lockObj)
     {
       store.TryGetValue(key, out TranslationEntry existing);
-      // 人工已校验/改过的条目受保护：自动 Record 路径不覆盖，保留人工成果
       if (existing != null && existing.Verified)
       {
         return;
       }
-      // 源文：本次 text 优先，否则沿用已有，最后回退 key
-      string mergedSource = existing?.Source;
-      if (!translated)
+      TranslationEntry updated = merge(existing);
+      if (updated == null)
       {
-        mergedSource = string.IsNullOrEmpty(text) ? (existing?.Source ?? key) : text;
+        return;
       }
-      // 译文：translated=true 时取本次 text；空则回退为源文
-      string mergedTranslation = existing?.Translation;
-      if (translated)
-      {
-        mergedTranslation = string.IsNullOrEmpty(text) ? mergedSource : text;
-      }
-      else if (string.IsNullOrEmpty(mergedTranslation))
-      {
-        mergedTranslation = mergedSource;
-      }
-      // translated：本次或已有任一为 true 即 true（终态 true 不被后到的 false 覆盖）
-      bool mergedTranslated = translated || (existing?.Translated ?? false);
-
-      TranslationEntry updated = new(key, mergedSource, mergedTranslation, mergedTranslated);
       if (existing != null && existing.Equals(updated))
       {
         return;
@@ -123,8 +149,12 @@ public static class AutoTranslationStore
     lock (lockObj)
     {
       store.TryGetValue(key, out TranslationEntry existing);
-      string source = existing?.Source ?? key;
-      TranslationEntry updated = new(key, source, translation, true, verified: true);
+      // 原文缺失（无已有源文）则不入库：用户改译文必须以已有原文为基础
+      if (string.IsNullOrEmpty(existing?.Source))
+      {
+        return;
+      }
+      TranslationEntry updated = new(key, existing.Source, translation, true, verified: true);
       if (existing != null && existing.Equals(updated))
       {
         return;
@@ -171,7 +201,7 @@ public static class AutoTranslationStore
     }
   }
 
-  /// <summary>懒启动后台定时器：首次 Record 调用时初始化，仅一次（双检锁）。</summary>
+  /// <summary>懒启动后台定时器：首次写入口（RecordSource/RecordTranslation）调用时初始化，仅一次（双检锁）。</summary>
   private static void EnsureTimerStarted()
   {
     if (timerStarted)
@@ -316,10 +346,12 @@ public static class AutoTranslationStore
         {
           if (node is XmlElement el && !string.IsNullOrEmpty(el.Name))
           {
+            // 原文缺失（旧文件无 source 或为空）的条目不载入：原文不得用 key 顶替
             string src = el.GetAttribute("source");
             if (string.IsNullOrEmpty(src))
             {
-              src = el.Name;
+              AutoLog.Warn($"跳过无原文条目（source 为空）: {el.Name}");
+              continue;
             }
             bool translated = true;
             string translatedAttr = el.GetAttribute("translated");

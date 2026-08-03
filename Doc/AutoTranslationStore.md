@@ -1,43 +1,45 @@
 #### 方法
 ```csharp
-// 静态方法；调用方每次只传一个阶段，靠 translated 标识传的是原文还是译文：
-//  源文阶段：Record(key, text: 原文, translated: false)
-//  译文阶段：Record(key, text: 译文, translated: true)
-public static void Record(string key, string text, bool translated = false)
+// 拆为两个写入口，调用方按阶段调用，不再用 bool 参数区分：
+//  源文阶段：RecordSource(key, 原文)
+//  译文阶段：RecordTranslation(key, 译文)  —— 必须先有原文，否则打回
+public static void RecordSource(string key, string source)
+public static void RecordTranslation(string key, string translation)
 ```
 
 #### 记录流程
 ```mermaid
 flowchart TD
-    A["Record(key, text, translated=false)"] --> B{Writable?}
-    B -->|否 开关关/当前为English| Z[直接返回]
-    B -->|是| C{DevMode?}
-    C -->|是| Z
-    C -->|否| D[首次 Record 时 TryLoad 加载历史 auto.xml]
+    A["RecordSource(key, source)"] --> B{source 空?}
+    B -->|是| Z[直接返回]
+    B -->|否| C{Writable?}
+    C -->|否 开关关/当前为English/DevMode| Z
+    C -->|是| D[首次写入口时 TryLoad 加载历史 auto.xml]
 
-    D --> E[store 查 key]
-    E -->|不存在| F["mergedSource = translated? 沿用 : (text ?? key)"]
-    E -->|存在| G["取 existing"]
-    G --> H["mergedSource = translated? existing.Source : (text ?? existing.Source ?? key)"]
-    F --> I
-    H --> I
-    I["mergedTranslation = translated? (text ?? mergedSource) : (existing.Translation ?? mergedSource)"]
-    I --> J["mergedTranslated = translated || existing.Translated（OR，终态true不被false覆盖）"]
+    D --> E["Mutate(key, merge): 查 existing"]
+    E -->|Verified=true| Z[受保护跳过]
+    E -->|原文空则补 source| F["Translation 空则回退 source, Translated 沿用"]
+    F --> G{与 existing 相等?}
+    G -->|是 无变化| Z
+    G -->|否| H["store[key] = updated, dirtyCount++"]
+    H --> I{dirtyCount >= 50?}
+    I -->|是| J[Flush 落盘]
+    I -->|否| Z
 
-    J --> K{与 existing 相等?}
-    K -->|是 无变化| Z
-    K -->|否| L["store[key] = updated, dirtyCount++"]
-    L --> M{dirtyCount >= 50?}
-    M -->|是| N[Flush 落盘]
+    K["RecordTranslation(key, translation)"] --> L{translation 空?}
+    L -->|是| Z
+    L -->|否| M{Writable?/DevMode?}
     M -->|否| Z
+    M -->|是| N["Mutate: 无 existing 或无 Source → 返回 null 打回"]
+    N --> O["Translation = translation, Translated = true"]
+    O --> G
 ```
 
 #### 关键点
-- **单 text 字段 + translated 标识阶段**：`translated=false` 时 `text` 填 Source 槽；`translated=true` 时 `text` 填 Translation 槽。调用方每次只传一个 text，不原文译文同传。
-- **各自回退**：源文阶段 `text` 为空回退 `key`；译文阶段 `text` 为空回退为 `mergedSource`。
-- **translated 取 OR**：任一阶段为 true 即 true，后到的 false 不覆盖已译终态。
-- **Writable 短路**：开关未开 或 当前语言为 English（源语言基准包）时不写、不落盘。
-- **DevMode 拦截**：DevMode 下游戏套变音伪本地化，跳过记录避免污染。
+- **两入口替代 translated 参数**：原来用 `Record(key, text, translated)` 的 bool 区分阶段，现拆为 `RecordSource`（存原文）与 `RecordTranslation`（存译文）。`translated` 退化为内部派生状态，不再暴露给调用方——是否"已译"由 `Translation` 是否非空且≠`Source` 决定，落盘时写出。
+- **原文不可缺**：`Source` 不得用 key 顶替。`RecordSource` 的 `source` 为空不入库；`RecordTranslation` 必须先有原文（无 existing 或 `Source` 为空直接打回），不存在"无原文凭空建译文"的路径。`SetTranslation`（用户改译文）同样要求已有原文。
+- **Writable 短路**：开关未开 或 当前语言为 English（源语言基准包）时不写、不落盘；DevMode 下游戏套变音伪本地化，跳过记录避免污染。
+- **Mutate 共用逻辑**：`RecordSource`/`RecordTranslation` 经私有 `Mutate(key, merge)` 加锁合并；`merge` 返回 null 即打回；`Verified=true` 条目整体跳过（自动路径不覆盖人工成果）。
 - **落盘**：达阈值 50 条立即 flush；另有定时 3s 与强制 Flush 触发（见 `AutoTranslationStore.cs`）。
 - **落盘字段语义（未译条目）**：无译文时 `Translation` 回退为原文、`translated="false"`，同时 `source` 属性保留原文。两种等价表达：
   - 译文位置写原文、`translated=false`（靠属性区分未译）；
