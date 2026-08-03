@@ -101,44 +101,9 @@ public class TranslationDispatcher : ITranslationPlatform
     public string PlatformName => DispatcherNameKey;
 
     /// <summary>
-    /// 源语言码映射：转发到首个能识别该 RimWorld 语言名的翻译源；均无则返回 null。
-    /// source 为 RimWorld 语言名（如 "English"）。
-    /// </summary>
-    public string GetSourceLangCode(string rimWorldLangName)
-    {
-        foreach (ITranslationPlatform s in _sources)
-        {
-            string code = s.GetLangCode(rimWorldLangName);
-            if (!string.IsNullOrEmpty(code))
-            {
-                return code;
-            }
-        }
-        return null;
-    }
-
-    /// <summary>
-    /// 目标语言码映射：转发到首个能识别该 RimWorld 语言名的翻译源；均无则返回 null。
-    /// target 为 RimWorld 语言名（如 "ChineseSimplified (简体中文)"）。
-    /// </summary>
-    public string GetTargetLangCode(string rimWorldLangName)
-    {
-        foreach (ITranslationPlatform s in _sources)
-        {
-            string code = s.GetLangCode(rimWorldLangName);
-            if (!string.IsNullOrEmpty(code))
-            {
-                return code;
-            }
-        }
-        return null;
-    }
-
-
-    /// <summary>
     /// 调度器本身不翻译、也不维护语言映射，故直接返回 null。
-    /// 语言解析由各翻译源内部完成；Translate 已将 RimWorld 语言名透传给各源。
-    /// 外部不应调用本方法（仅为实现接口契约而存在）。
+    /// 语言解析由各翻译源内部完成（TranslatePlatform.GetLangCode）；Translate 已将 RimWorld 语言名透传给各源。
+    /// 外部不应调用本方法（仅为实现接口契约而存在）。转换是平台内部的事，外部只传 RimWorld 语言名。
     /// </summary>
     public string GetLangCode(string name) => null;
 
@@ -176,7 +141,7 @@ public class TranslationDispatcher : ITranslationPlatform
 
             if (IsInCooldown(platform))
             {
-                AutoLog.Warn("[AutoTranslator] 翻译源 " + platform.PlatformName + " 处于关禁闭期，跳过。");
+                AutoLog.Info("[AutoTranslator] 翻译源 " + platform.PlatformName + " 处于关禁闭期，跳过。");
                 continue;
             }
 
@@ -201,7 +166,9 @@ public class TranslationDispatcher : ITranslationPlatform
     /// </summary>
     private TranslationResult TryWithRateLimitRetry(ITranslationPlatform platform, string source, string target, string text)
     {
+        // 每次真正调用平台接口都计一次数（含限流重试的每一次），统计口径 = 实际发出的请求数。
         TranslationResult result = platform.Translate(source, target, text);
+        TranslateStats.RecordCall(platform.PlatformName, result.Success);
         int retry = 0;
         while (!result.Success && result.ErrorCode == TranslationErrorCode.RateLimited && retry < MaxRetryOnRateLimit)
         {
@@ -211,6 +178,7 @@ public class TranslationDispatcher : ITranslationPlatform
                             + " 限流，第 " + retry + " 次重试，等待 " + backoff + "ms。");
             Thread.Sleep(backoff);
             result = platform.Translate(source, target, text);
+            TranslateStats.RecordCall(platform.PlatformName, result.Success);
         }
 
         return result;

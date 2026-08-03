@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using RimWorld;
@@ -22,6 +23,9 @@ public static class AutoTranslatorEngine
 
     // 配置锁：避免刷新与拦截并发改 Dispatcher。
     private static readonly object configLock = new();
+
+    // 正在后台翻译中的 key（去重用）：Postfix 每帧重入同一 key，任务未回来前不重复提交请求。
+    private static readonly ConcurrentDictionary<string, byte> inFlight = new();
 
     /// <summary>构建或重建翻译源：把设置里已启用的平台凭据注入对应平台实例并注册到派发器。</summary>
     private static void BuildSources()
@@ -142,9 +146,11 @@ public static class AutoTranslatorEngine
     /// <summary>
     /// 后台执行一段翻译工作：异常不吞，捕获后原样转交主线程输出完整堆栈（含内部异常），
     /// 保证 UI 不被 HTTP 阻塞、同时后台错误依然可见。
+    /// 同时登记后台任务提交/完成计数，便于检查「翻译完了是否还有后台任务在跑」。
     /// </summary>
     private static void RunInBackground(string context, Action work)
     {
+        TranslateStats.TaskSubmitted();
         Task.Run(() =>
         {
             try
@@ -154,6 +160,15 @@ public static class AutoTranslatorEngine
             catch (Exception ex)
             {
                 ReportToMainThread(context, ex);
+            }
+            finally
+            {
+                TranslateStats.TaskFinished();
+                // 收尾时若已无在跑任务，说明本轮翻译彻底结束，输出一次统计便于核对是否还有多余请求。
+                if (TranslateStats.RunningTasks == 0)
+                {
+                    TranslateStats.LogSummary();
+                }
             }
         });
     }
@@ -180,10 +195,31 @@ public static class AutoTranslatorEngine
         {
             return;
         }
+        // 已译兜底：Postfix 每帧都会重入同一 key，若已有译文则绝不再提交后台请求，
+        // 避免「翻译完了还在后台刷接口」。
+        if (AutoTranslationStore.IsTranslated(key))
+        {
+            return;
+        }
+        // 同一 key 已有后台任务在跑时不重复提交（Postfix 每帧重入，任务未回来前会反复提交同一条）。
+        if (!inFlight.TryAdd(key, 0))
+        {
+            return;
+        }
 
         string capturedKey = key;
         string capturedText = text;
-        RunInBackground(capturedKey, () => Translate(capturedKey, capturedText));
+        RunInBackground(capturedKey, () =>
+        {
+            try
+            {
+                Translate(capturedKey, capturedText);
+            }
+            finally
+            {
+                inFlight.TryRemove(capturedKey, out _);
+            }
+        });
     }
 
     /// <summary>一键翻译：把当前未翻译的已记录条目批量提交翻译（后台异步执行，不阻塞主线程）。</summary>
