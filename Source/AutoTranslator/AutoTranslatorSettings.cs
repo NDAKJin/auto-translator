@@ -30,6 +30,7 @@ public class AutoTranslatorSettings : ModSettings
         if (Scribe.mode == LoadSaveMode.LoadingVars || Scribe.mode == LoadSaveMode.ResolvingCrossRefs)
         {
             AutoTranslationStore.SetTranslationLogEnabled(enableTranslationLog);
+            AutoLog.Enabled = enableTranslationLog;
         }
     }
 
@@ -64,6 +65,8 @@ public class AutoTranslatorSettings : ModSettings
         enableTranslationLog = false;
         enableRealtimeUpdate = false;
         credentialsCollapsed = false;
+        AutoLog.Enabled = false;
+        AutoTranslationStore.SetTranslationLogEnabled(false);
     }
 }
 

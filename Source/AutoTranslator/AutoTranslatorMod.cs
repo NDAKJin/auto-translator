@@ -67,6 +67,7 @@ public class AutoTranslatorMod : Mod
             if (prevLog != settings.enableTranslationLog)
             {
                 AutoTranslationStore.SetTranslationLogEnabled(settings.enableTranslationLog);
+                AutoLog.Enabled = settings.enableTranslationLog;
             }
             listing.CheckboxLabeled(TranslateKeys.EnableRealtimeUpdate.Translate(), ref settings.enableRealtimeUpdate);
 
