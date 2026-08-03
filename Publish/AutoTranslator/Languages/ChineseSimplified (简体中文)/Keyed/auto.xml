@@ -1,112 +1,124 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-16"?>
 <LanguageData>
-  <PLGOPT_DisableWorldDataDescription translated="true">允许禁用世界数据：</PLGOPT_DisableWorldDataDescription>
-  <PLGOPT_DisableWorldDataTitle translated="true">禁用世界数据</PLGOPT_DisableWorldDataTitle>
-  <PLFILT_FilteredTilesCleared translated="true">过滤后的瓷砖已清除。</PLFILT_FilteredTilesCleared>
-  <PLFILT_NewWorld translated="true">新世界</PLFILT_NewWorld>
-  <PreFilteringWorldTiles translated="true">世界瓦片预过滤</PreFilteringWorldTiles>
-  <PLFILT_ValidTilesRemainAfterFilter translated="true">预筛选：筛选后仍保留 {0} 个有效互动程序（删除 {1} 个互动程序）。</PLFILT_ValidTilesRemainAfterFilter>
-  <PLFILT_TilesWithRoad translated="true">预筛选：｛0｝个瓷砖，至少有一条道路。</PLFILT_TilesWithRoad>
-  <PLFILT_PreFiltering translated="true">预过滤</PLFILT_PreFiltering>
-  <PLFILT_TilesWithRiver translated="true">预过滤：{0} 个至少包含一条河流的瓦片。</PLFILT_TilesWithRiver>
-  <PLMWFTIL_GoToStartOfTileList translated="true">转到图块列表的开头。</PLMWFTIL_GoToStartOfTileList>
-  <PLMWMINW_MinmizedWindow translated="true">最小化窗口</PLMWMINW_MinmizedWindow>
-  <PLMWFTIL_GoToEndOfList translated="true">转到互动程序列表的末尾。</PLMWFTIL_GoToEndOfList>
-  <PLMWLODSAV_GoToStartOfItemList translated="true">转到项目列表的开头。</PLMWLODSAV_GoToStartOfItemList>
-  <PLMWFTIL_GoToNextListPage translated="true">转到列表的下一页。</PLMWFTIL_GoToNextListPage>
-  <PLMWLODSAV_GoToPreviousListPage translated="true">转到列表的上一页。</PLMWLODSAV_GoToPreviousListPage>
-  <PLMWFTIL_GoToPreviousListPage translated="true">转到列表的上一页。</PLMWFTIL_GoToPreviousListPage>
-  <PLMWTT_TabName translated="true">地形</PLMWTT_TabName>
-  <PLMWLODSAV_GoToEndOfList translated="true">转到项目列表的末尾。</PLMWLODSAV_GoToEndOfList>
-  <PLMWTF_TabName translated="true">功能</PLMWTF_TabName>
-  <PLMWFTIL_FilteredTiles translated="true">筛选后的图块</PLMWFTIL_FilteredTiles>
-  <PLMWINF_WorldInfo translated="true">世界资讯</PLMWINF_WorldInfo>
-  <PLOPT_Options translated="true">选项</PLOPT_Options>
-  <PLMWLODSAV_Save translated="true">保存</PLMWLODSAV_Save>
-  <PLMWBB_SelectRandom translated="true">随机选择</PLMWBB_SelectRandom>
-  <PLMWT2T_TabName_1_6 translated="true">气候</PLMWT2T_TabName_1_6>
-  <PLMWBB_LoadSave translated="true">加载/保存</PLMWBB_LoadSave>
-  <PLMWBB_LoadOrSaveFilterPresets translated="true">加载或保存筛选器预设。</PLMWBB_LoadOrSaveFilterPresets>
-  <PLMWBB_ResetFilters translated="true">重置筛选器</PLMWBB_ResetFilters>
-  <PLMWBB_SelectAction translated="true">选择操作</PLMWBB_SelectAction>
-  <PLMWTT_SelectBiome translated="true">选择生物群落</PLMWTT_SelectBiome>
-  <PLMWTT_BiomeTypes translated="true">生物特征类型</PLMWTT_BiomeTypes>
-  <PLMWTT_TerrainTypes translated="true">地形类型</PLMWTT_TerrainTypes>
-  <PLMW_SelectAny translated="true">任何</PLMW_SelectAny>
-  <PLMW_All translated="true">全部</PLMW_All>
-  <PLMWTT_RoadTypes translated="true">道路类型</PLMWTT_RoadTypes>
-  <PLMW_None translated="true">无</PLMW_None>
-  <PLMW_Reset translated="true">重置</PLMW_Reset>
-  <PLMWTT_ButtonNoneTooltip translated="true">将所有元素设置为关闭状态。</PLMWTT_ButtonNoneTooltip>
-  <PLMWTT_ButtonAllTooltip translated="true">将所有元素设置为开启状态。</PLMWTT_ButtonAllTooltip>
-  <PLMWTT_ButtonResetTooltip translated="true">将所有元素重置为默认（部分）状态。</PLMWTT_ButtonResetTooltip>
-  <PLMWTT_ORANDTooltip translated="true">要应用的筛选类型。
-或: 每个项目独立评估。
-和: 所有项目一起评估。</PLMWTT_ORANDTooltip>
-  <PLMWTT_FilterBooleanAnd translated="true">与</PLMWTT_FilterBooleanAnd>
-  <PLINT_UsableMinMaxNumFieldMin translated="true">最小值</PLINT_UsableMinMaxNumFieldMin>
-  <PLMWTT_RiverTypes translated="true">河流类型</PLMWTT_RiverTypes>
-  <PLINT_UsableMinMaxNumFieldUse translated="true">使用</PLINT_UsableMinMaxNumFieldUse>
-  <PLINT_UsableMinMaxNumFieldMax translated="true">最大值</PLINT_UsableMinMaxNumFieldMax>
-  <PLMWTT_IsCoastalTileOcean translated="true">是海岸瓷砖（海洋）</PLMWTT_IsCoastalTileOcean>
-  <PLMW_Meter translated="true">米</PLMW_Meter>
-  <PLMWTT_UseCoastalRoation translated="true">使用沿海轮换</PLMWTT_UseCoastalRoation>
-  <PLMWTT_CoastalTiles translated="true">海岸瓷砖</PLMWTT_CoastalTiles>
-  <PLMWTT_UseCoastalRoationTooltip translated="true">允许搜索海岸朝向特定方向的沿海海洋/海区瓦片。</PLMWTT_UseCoastalRoationTooltip>
-  <PLMWTT_SelectCoastRotation translated="true">选择海岸轮换</PLMWTT_SelectCoastRotation>
-  <PLMWTT_SelectedCoastRotation translated="true">精选海岸轮换</PLMWTT_SelectedCoastRotation>
-  <PLMWTT_IsCoastalTileLakeTooltip translated="true">一个湖泊最多由15个水格组成，周围被陆地环绕。</PLMWTT_IsCoastalTileLakeTooltip>
-  <PLMWTT_IsCoastalTileLake translated="true">是海岸瓷砖（湖）</PLMWTT_IsCoastalTileLake>
-  <PLMWTT_StoneTypes translated="true">石材类型</PLMWTT_StoneTypes>
-  <PLMWTT_NoOrder translated="true">无订单</PLMWTT_NoOrder>
-  <PLMWTT_StoneOrderTooltip translated="true">石头过滤是否依赖于顺序。
-按下按钮可更改过滤器状态。</PLMWTT_StoneOrderTooltip>
-  <PLMWTT_UseNumberOfStoneTypes translated="true">使用石材类型数量[2,3]</PLMWTT_UseNumberOfStoneTypes>
-  <PLMWTF_AdjBiomes translated="true">相邻生物群系</PLMWTF_AdjBiomes>
-  <PLMWTF_Features translated="true">地图功能</PLMWTF_Features>
-  <PLMWT2T_MostLeastSelectCharacteristic translated="true">选择一个特征</PLMWT2T_MostLeastSelectCharacteristic>
-  <PLMWT2T_MostLeastSelectCharacteristicType translated="true">选择特征类型</PLMWT2T_MostLeastSelectCharacteristicType>
-  <PLMWT2T_MostLeastPressButtonFirst translated="true">请先按“{0}”按钮。</PLMWT2T_MostLeastPressButtonFirst>
-  <PLMWT2T_SelectWorldFeature translated="true">选择世界功能</PLMWT2T_SelectWorldFeature>
-  <PLMWT2T_WorldFeatureSelection translated="true">世界特征选择</PLMWT2T_WorldFeatureSelection>
-  <PLMWT2T_WorldFeature translated="true">世界特征</PLMWT2T_WorldFeature>
-  <PLMWT2T_OpenCoordinatesWindow translated="true">打开坐标窗口</PLMWT2T_OpenCoordinatesWindow>
-  <PLMWT2T_CoordinatesWindow translated="true">坐标窗口</PLMWT2T_CoordinatesWindow>
-  <PLMWT2T_TempPickTileOnWorldMap translated="true">在世界地图上选一块瓷砖！</PLMWT2T_TempPickTileOnWorldMap>
-  <PLMWT2T_RainfallMillimeters translated="true">降雨量（毫米）</PLMWT2T_RainfallMillimeters>
-  <PLMWFTIL_SelectedTileInfo translated="true">选定的图块信息</PLMWFTIL_SelectedTileInfo>
-  <PLMWT2T_TemperatureForecast translated="true">气温预报</PLMWT2T_TemperatureForecast>
-  <PLMWINF_PlanetName translated="true">行星名称</PLMWINF_PlanetName>
-  <PLMWINF_SettleableTiles translated="true">可放置的瓷砖</PLMWINF_SettleableTiles>
-  <PLMWINF_TilesWithRivers translated="true">带有河流的瓷砖</PLMWINF_TilesWithRivers>
-  <PLMWINF_TotalTiles translated="true">瓷砖总数</PLMWINF_TotalTiles>
-  <PLMWINF_Biomes translated="true">生物群落</PLMWINF_Biomes>
-  <PLMWINF_TilesWithRoads translated="true">带道路的瓷砖</PLMWINF_TilesWithRoads>
-  <PLMWINF_NumberOfTiles translated="true">图块数量</PLMWINF_NumberOfTiles>
-  <PLMWINF_WorldRecords translated="true">世界纪录</PLMWINF_WorldRecords>
-  <PLMWINF_WorldLowest translated="true">世界最低</PLMWINF_WorldLowest>
-  <PLMWINF_ClearInfo translated="true">清晰的信息</PLMWINF_ClearInfo>
-  <PLOPT_FilterOptions translated="true">筛选选项</PLOPT_FilterOptions>
-  <PLOPT_AllowLiveFilteringToolTip translated="true">【警告：CPU占用高】允许在不点击“筛选”按钮的情况下进行筛选。</PLOPT_AllowLiveFilteringToolTip>
-  <PLOPT_AllowImpassableTilesToolTip translated="true">允许选择并过滤不可通行的地形格。</PLOPT_AllowImpassableTilesToolTip>
-  <PLMWINF_FilterInfo translated="true">筛选器信息</PLMWINF_FilterInfo>
-  <PLOPT_DisablePreFilterCheck translated="true">禁用预过滤检查</PLOPT_DisablePreFilterCheck>
-  <PLOPT_DisablePreFilterCheckToolTip translated="true">禁用“生物群系与地形必须以不低于50%的世界覆盖率被选中”这一检查。</PLOPT_DisablePreFilterCheckToolTip>
-  <PLOPT_AllowLiveFiltering translated="true">允许实时筛选</PLOPT_AllowLiveFiltering>
-  <PLOPT_ViewPartialOffNoSelectToolTip translated="true">允许在GUI上为分组的三态项显示“PartialOffNoSelect”按钮。</PLOPT_ViewPartialOffNoSelectToolTip>
-  <PLOPT_ResetAllFiltersOnNewWorld translated="true">重置新世界的全部筛选条件</PLOPT_ResetAllFiltersOnNewWorld>
-  <PLOPT_AllowImpassableTiles translated="true">允许无法通行的瓷砖</PLOPT_AllowImpassableTiles>
-  <PLOPT_ResetAllFiltersOnNewWorldToolTip translated="true">如果启用，新生成的世界将重置所有过滤器为默认状态；否则，过滤器将保留其先前的状态。</PLOPT_ResetAllFiltersOnNewWorldToolTip>
-  <PLOPT_ShowFilterHeaviness translated="true">显示过滤器的负载情况</PLOPT_ShowFilterHeaviness>
-  <PLOPT_ShowFilterHeavinessToolTip translated="true">在GUI的过滤器标题栏中显示过滤器的计算开销（可能的CPU计算负载）。</PLOPT_ShowFilterHeavinessToolTip>
-  <PLOPT_AllowInvalidTilesForNewSettlement translated="true">允许新建定居点使用无效地形块</PLOPT_AllowInvalidTilesForNewSettlement>
-  <PLOPT_TileHighlighterOptions translated="true">图块高亮显示选项</PLOPT_TileHighlighterOptions>
-  <PLOPT_DisableTileHighlighting translated="true">禁用图块高亮显示</PLOPT_DisableTileHighlighting>
-  <PLOPT_DisableTileBlinkingToolTip translated="true">在世界地图上禁用过滤后的图块闪烁（“呼吸”）。</PLOPT_DisableTileBlinkingToolTip>
-  <PLOPT_DisableTileHighlightingToolTip translated="true">完全禁用磁贴高亮显示。</PLOPT_DisableTileHighlightingToolTip>
-  <PLOPT_DisableTileBlinking translated="true">禁用磁贴闪烁</PLOPT_DisableTileBlinking>
-  <PLOPT_ShowDebugTileId translated="true">显示调试图块ID</PLOPT_ShowDebugTileId>
-  <PLOPT_ShowDebugTileIdToolTip translated="true">显示选中图块的调试图块ID。</PLOPT_ShowDebugTileIdToolTip>
-  <PLOPT_BypassTileHighlighterMaximumToolTip translated="true">允许高亮显示超过{0}个图块。</PLOPT_BypassTileHighlighterMaximumToolTip>
-  <PLOPT_BypassTileHighlighterMaximum translated="true">绕过图块高亮最大值</PLOPT_BypassTileHighlighterMaximum>
+  <PLFILT_FilteredTilesCleared source="Filtered tiles cleared." translated="true" verified="false">已清除筛选后的图块。</PLFILT_FilteredTilesCleared>
+  <PLFILT_NewWorld source="New World" translated="true" verified="false">新世界</PLFILT_NewWorld>
+  <PLFILT_PreFiltering source="PreFiltering" translated="true" verified="false">预过滤</PLFILT_PreFiltering>
+  <PLFILT_TilesWithRiver source="Pre-filter: {0} tiles with at least one river." translated="true" verified="false">预过滤：{0} 个至少包含一条河流的瓦片。</PLFILT_TilesWithRiver>
+  <PLFILT_TilesWithRoad source="Pre-filter: {0} tiles with at least one road." translated="true" verified="false">预过滤器：{0}至少有一条道路的瓷砖。</PLFILT_TilesWithRoad>
+  <PLFILT_ValidTilesRemainAfterFilter source="Pre-filter: {0} valid tile(s) remain(s) after filtering ({1} tile(s) removed)." translated="true" verified="false">预过滤器：过滤后{0}个有效磁贴保留（{1}个磁贴已删除）。</PLFILT_ValidTilesRemainAfterFilter>
+  <PLGOPT_DisableWorldDataDescription source="Allow disabling World Data:&#xD;World Data are various data used by PrepareLanding to display information about the world.If set, this removes the information, saves some memory and some CPU cycles.&#xD;In return less information is available." translated="true" verified="false">允许禁用世界数据：世界数据是PrepareLanding用于显示有关世界信息的各种数据。启用此选项后，将移除这些信息，从而节省部分内存和CPU资源。作为回报，可获得的信息也更少。</PLGOPT_DisableWorldDataDescription>
+  <PLGOPT_DisableWorldDataTitle source="Disable World Data" translated="true" verified="false">禁用世界数据</PLGOPT_DisableWorldDataTitle>
+  <PLINT_UsableMinMaxNumFieldMax source="Max" translated="true" verified="false">马克斯</PLINT_UsableMinMaxNumFieldMax>
+  <PLINT_UsableMinMaxNumFieldMin source="Min" translated="true" verified="false">敏</PLINT_UsableMinMaxNumFieldMin>
+  <PLINT_UsableMinMaxNumFieldUse source="Use" translated="true" verified="false">使用</PLINT_UsableMinMaxNumFieldUse>
+  <PLMW_All source="All" translated="true" verified="false">全部</PLMW_All>
+  <PLMW_Meter source="Meter" translated="true" verified="false">米</PLMW_Meter>
+  <PLMW_None source="None" translated="true" verified="false">一个都没有</PLMW_None>
+  <PLMW_Reset source="Reset" translated="true" verified="false">重置</PLMW_Reset>
+  <PLMW_SelectAny source="Any" translated="true" verified="false">任何</PLMW_SelectAny>
+  <PLMWBB_FilterTiles source="Filter Tiles" translated="true" verified="false">过滤瓦片</PLMWBB_FilterTiles>
+  <PLMWBB_LoadOrSaveFilterPresets source="Load or Save Filter Presets." translated="true" verified="false">加载或保存过滤器预设。</PLMWBB_LoadOrSaveFilterPresets>
+  <PLMWBB_LoadSave source="Load / Save" translated="true" verified="false">加载/保存</PLMWBB_LoadSave>
+  <PLMWBB_Minimize source="Minimize" translated="true" verified="false">最小化</PLMWBB_Minimize>
+  <PLMWBB_ResetFilters source="Reset Filters" translated="true" verified="false">重置筛选条件</PLMWBB_ResetFilters>
+  <PLMWBB_SelectAction source="Select Action" translated="true" verified="false">选择动作</PLMWBB_SelectAction>
+  <PLMWBB_SelectRandom source="Select Random" translated="true" verified="false">选择随机</PLMWBB_SelectRandom>
+  <PLMWFTIL_FilteredTiles source="Filtered Tiles" translated="true" verified="false">过滤瓷砖</PLMWFTIL_FilteredTiles>
+  <PLMWFTIL_GoToEndOfList source="Go to the end of the tile list." translated="true" verified="false">转到瓷砖列表的末尾。</PLMWFTIL_GoToEndOfList>
+  <PLMWFTIL_GoToNextListPage source="Go to next page of the list." translated="true" verified="false">转到列表的下一页。</PLMWFTIL_GoToNextListPage>
+  <PLMWFTIL_GoToPreviousListPage source="Go to previous page of the list." translated="true" verified="false">转到列表的上一页。</PLMWFTIL_GoToPreviousListPage>
+  <PLMWFTIL_GoToStartOfTileList source="Go to the start of the tile list." translated="true" verified="false">转到磁贴列表的开头。</PLMWFTIL_GoToStartOfTileList>
+  <PLMWFTIL_SelectedTileInfo source="Selected Tile Information" translated="true" verified="false">所选磁贴信息</PLMWFTIL_SelectedTileInfo>
+  <PLMWINF_Biomes source="Biomes" translated="true" verified="false">生物群系</PLMWINF_Biomes>
+  <PLMWINF_ClearInfo source="Clear Information" translated="true" verified="false">清除信息</PLMWINF_ClearInfo>
+  <PLMWINF_FilterInfo source="Filter Information" translated="true" verified="false">筛选信息</PLMWINF_FilterInfo>
+  <PLMWINF_NumberOfTiles source="Number of Tiles" translated="true" verified="false">瓷砖数量</PLMWINF_NumberOfTiles>
+  <PLMWINF_PlanetName source="Planet Name" translated="true" verified="false">行星名称</PLMWINF_PlanetName>
+  <PLMWINF_SettleableTiles source="Settleable Tiles" translated="true" verified="false">可放置的瓷砖</PLMWINF_SettleableTiles>
+  <PLMWINF_TilesWithRivers source="Tiles with Rivers" translated="true" verified="false">河流瓷砖</PLMWINF_TilesWithRivers>
+  <PLMWINF_TilesWithRoads source="Tiles with Roads" translated="true" verified="false">带有道路的瓷砖</PLMWINF_TilesWithRoads>
+  <PLMWINF_TotalTiles source="Total Tiles" translated="true" verified="false">瓷砖总数</PLMWINF_TotalTiles>
+  <PLMWINF_WorldHighest source="World Highest" translated="true" verified="false">世界最高</PLMWINF_WorldHighest>
+  <PLMWINF_WorldInfo source="World Info" translated="true" verified="false">世界资讯</PLMWINF_WorldInfo>
+  <PLMWINF_WorldLowest source="World Lowest" translated="true" verified="false">世界最低</PLMWINF_WorldLowest>
+  <PLMWINF_WorldRecords source="World Records" translated="true" verified="false">世界纪录</PLMWINF_WorldRecords>
+  <PLMWLODSAV_GoToEndOfList source="Go to the end of the items list." translated="true" verified="false">转到项目列表的末尾。</PLMWLODSAV_GoToEndOfList>
+  <PLMWLODSAV_GoToNextListPage source="Go to next page of the list." translated="true" verified="false">转到列表的下一页。</PLMWLODSAV_GoToNextListPage>
+  <PLMWLODSAV_GoToPreviousListPage source="Go to previous page of the list." translated="true" verified="false">转到列表的上一页。</PLMWLODSAV_GoToPreviousListPage>
+  <PLMWLODSAV_GoToStartOfItemList source="Go to the start of the item list." translated="true" verified="false">转到项目列表的开头。</PLMWLODSAV_GoToStartOfItemList>
+  <PLMWLODSAV_Load source="Load" translated="true" verified="false">加载</PLMWLODSAV_Load>
+  <PLMWLODSAV_Save source="Save" translated="true" verified="false">保存</PLMWLODSAV_Save>
+  <PLMWMINW_MinmizedWindow source="Minimized Window" translated="true" verified="false">最小化窗口</PLMWMINW_MinmizedWindow>
+  <PLMWT2T_CoordinatesWindow source="Coordinates Window" translated="true" verified="false">坐标窗口</PLMWT2T_CoordinatesWindow>
+  <PLMWT2T_MostLeastCharacteristics source="Highest / Lowest Characteristics" translated="true" verified="false">最高/最低特征</PLMWT2T_MostLeastCharacteristics>
+  <PLMWT2T_MostLeastNumberOfTiles source="Number of Tiles" translated="true" verified="false">图块数量</PLMWT2T_MostLeastNumberOfTiles>
+  <PLMWT2T_MostLeastPressButtonFirst source="Press the &quot;{0}&quot; button first." translated="true" verified="false">先按“{0}”按钮。</PLMWT2T_MostLeastPressButtonFirst>
+  <PLMWT2T_MostLeastResult source="Result" translated="true" verified="false">结果</PLMWT2T_MostLeastResult>
+  <PLMWT2T_MostLeastSelectCharacteristic source="Select a Characteristic" translated="true" verified="false">选择一个特征</PLMWT2T_MostLeastSelectCharacteristic>
+  <PLMWT2T_MostLeastSelectCharacteristicType source="Select Characteristic Type" translated="true" verified="false">选择特征类型</PLMWT2T_MostLeastSelectCharacteristicType>
+  <PLMWT2T_OpenCoordinatesWindow source="Open Coordinates Window" translated="true" verified="false">打开坐标窗口</PLMWT2T_OpenCoordinatesWindow>
+  <PLMWT2T_RainfallMillimeters source="mm" translated="true" verified="false">毫米</PLMWT2T_RainfallMillimeters>
+  <PLMWT2T_SelectWorldFeature source="Select World Feature" translated="true" verified="false">选择世界功能</PLMWT2T_SelectWorldFeature>
+  <PLMWT2T_TabName_1_6 source="Climate" translated="true" verified="false">气候</PLMWT2T_TabName_1_6>
+  <PLMWT2T_TemperatureForecast source="Temperature Forecast" translated="true" verified="false">温度预报</PLMWT2T_TemperatureForecast>
+  <PLMWT2T_TempPickTileOnWorldMap source="Pick a tile on the world map!" translated="true" verified="false">在世界地图上选一块瓷砖！</PLMWT2T_TempPickTileOnWorldMap>
+  <PLMWT2T_WorldFeature source="World Feature" translated="true" verified="false">世界特征</PLMWT2T_WorldFeature>
+  <PLMWT2T_WorldFeatureSelection source="World Feature Selection" translated="true" verified="false">世界功能选择</PLMWT2T_WorldFeatureSelection>
+  <PLMWTF_AdjBiomes source="Adjacent Biomes" translated="true" verified="false">相邻生物群落</PLMWTF_AdjBiomes>
+  <PLMWTF_Features source="Map Features" translated="true" verified="false">地图特色</PLMWTF_Features>
+  <PLMWTF_TabName source="Features" translated="true" verified="false">特性</PLMWTF_TabName>
+  <PLMWTT_BiomeTypes source="Biome Types" translated="true" verified="false">生物群系类型</PLMWTT_BiomeTypes>
+  <PLMWTT_ButtonAllTooltip source="Set all elements to the On state." translated="true" verified="false">将所有元素设置为On状态。</PLMWTT_ButtonAllTooltip>
+  <PLMWTT_ButtonNoneTooltip source="Set all elements to the Off state." translated="true" verified="false">将所有元素设置为“关闭”状态。</PLMWTT_ButtonNoneTooltip>
+  <PLMWTT_ButtonResetTooltip source="Reset all elements to their default (Partial) state." translated="true" verified="false">将所有元素重置为其默认（部分）状态。</PLMWTT_ButtonResetTooltip>
+  <PLMWTT_CoastalTiles source="Coastal Tiles" translated="true" verified="false">海岸瓷砖</PLMWTT_CoastalTiles>
+  <PLMWTT_Filter source="Filter" translated="true" verified="false">过滤</PLMWTT_Filter>
+  <PLMWTT_FilterBooleanAnd source="AND" translated="true" verified="false">与</PLMWTT_FilterBooleanAnd>
+  <PLMWTT_IsCoastalTileLake source="Is Coastal Tile (lake)" translated="true" verified="false">是海岸瓷砖（湖）</PLMWTT_IsCoastalTileLake>
+  <PLMWTT_IsCoastalTileLakeTooltip source="A lake is at most 15 tiles of water surrounded by land." translated="true" verified="false">一个湖最多有15片水，周围是陆地。</PLMWTT_IsCoastalTileLakeTooltip>
+  <PLMWTT_IsCoastalTileOcean source="Is Coastal Tile (ocean)" translated="true" verified="false">是海岸瓷砖（海洋）</PLMWTT_IsCoastalTileOcean>
+  <PLMWTT_NoOrder source="No Order" translated="true" verified="false">弃权</PLMWTT_NoOrder>
+  <PLMWTT_ORANDTooltip source="Type of filtering to apply.&#xA;OR: each item is evaluated independently.&#xA;AND: all items are evaluated together." translated="true" verified="false">要应用的过滤类型。
+或者：每个项目均独立评估。
+并且：所有条件将同时进行求值。</PLMWTT_ORANDTooltip>
+  <PLMWTT_RiverTypes source="River Types" translated="true" verified="false">河流类型</PLMWTT_RiverTypes>
+  <PLMWTT_RoadTypes source="Road Types" translated="true" verified="false">道路类型</PLMWTT_RoadTypes>
+  <PLMWTT_SelectBiome source="Select Biome" translated="true" verified="false">选择生物特征</PLMWTT_SelectBiome>
+  <PLMWTT_SelectCoastRotation source="Select Coast Rotation" translated="true" verified="false">选择海岸轮换</PLMWTT_SelectCoastRotation>
+  <PLMWTT_SelectedCoastRotation source="Selected Coast Rotation" translated="true" verified="false">选定的海岸旋转</PLMWTT_SelectedCoastRotation>
+  <PLMWTT_SelectTerrain source="Select Terrain" translated="true" verified="false">选择地形</PLMWTT_SelectTerrain>
+  <PLMWTT_StoneOrderTooltip source=" Whether Stone Filtering is order dependent or not.&#xA;Press button to change filter state." translated="true" verified="false"> 石头过滤是否依赖于订单。
+按按钮更改过滤器状态。</PLMWTT_StoneOrderTooltip>
+  <PLMWTT_StoneTypes source="Stone Types" translated="true" verified="false">石材类型</PLMWTT_StoneTypes>
+  <PLMWTT_TabName source="Terrain" translated="true" verified="false">地形</PLMWTT_TabName>
+  <PLMWTT_TerrainTypes source="Terrain Types" translated="true" verified="false">地形类型</PLMWTT_TerrainTypes>
+  <PLMWTT_UseCoastalRoation source="Use Coastal Rotation" translated="true" verified="false">使用海岸轮换</PLMWTT_UseCoastalRoation>
+  <PLMWTT_UseCoastalRoationTooltip source="Allow to search for coastal ocean/sea tiles which have a coast facing a specific direction." translated="true" verified="false">允许搜索具有面向特定方向的海岸的沿海海洋/海洋瓷砖。</PLMWTT_UseCoastalRoationTooltip>
+  <PLMWTT_UseNumberOfStoneTypes source="Use # of stone types [2,3]" translated="true" verified="false">使用石材类型数量[2,3]</PLMWTT_UseNumberOfStoneTypes>
+  <PLMWTT_UseNumberOfStoneTypesToolTip source="Filter tiles that have only the given number of stone types (whatever the types are). This disables the other stone filters." translated="true" verified="false">仅具有给定数量的石材类型（无论类型如何）的过滤砖。这将禁用其他石过滤器。</PLMWTT_UseNumberOfStoneTypesToolTip>
+  <PLOPT_AllowImpassableTiles source="Allow Impassable Tiles" translated="true" verified="false">允许不可通行的地形</PLOPT_AllowImpassableTiles>
+  <PLOPT_AllowImpassableTilesToolTip source="Allow selection and filtering of impassable tiles." translated="true" verified="false">允许选择并过滤不可通行的地形格。</PLOPT_AllowImpassableTilesToolTip>
+  <PLOPT_AllowInvalidTilesForNewSettlement source="Allow Invalid Tiles for New Settlement" translated="true" verified="false">允许新建定居点使用无效地形块</PLOPT_AllowInvalidTilesForNewSettlement>
+  <PLOPT_AllowInvalidTilesForNewSettlementToolTip source="If ON, this prevents a last pass that would have removed tiles deemed as not valid for a new settlement." translated="true" verified="false">如果开启，这将防止最后一次通过，该次通过将移除被视为对新定居点无效的瓷砖。</PLOPT_AllowInvalidTilesForNewSettlementToolTip>
+  <PLOPT_AllowLiveFiltering source="Allow Live Filtering" translated="true" verified="false">允许实时筛选</PLOPT_AllowLiveFiltering>
+  <PLOPT_AllowLiveFilteringToolTip source="[Warning: CPU heavy] Allow filtering without pressing the &quot;Filter&quot; button." translated="true" verified="false">【警告：CPU占用高】允许在不点击“筛选”按钮的情况下进行筛选。</PLOPT_AllowLiveFilteringToolTip>
+  <PLOPT_BypassTileHighlighterMaximum source="Bypass Tile Highlighter Maximum" translated="true" verified="false">绕过图块高亮最大值</PLOPT_BypassTileHighlighterMaximum>
+  <PLOPT_BypassTileHighlighterMaximumToolTip source="Allow highlighting more than {0} tiles." translated="true" verified="false">允许高亮显示超过{0}个图块。</PLOPT_BypassTileHighlighterMaximumToolTip>
+  <PLOPT_DisablePreFilterCheck source="Disable PreFilter Check" translated="true" verified="false">禁用预过滤器检查</PLOPT_DisablePreFilterCheck>
+  <PLOPT_DisablePreFilterCheckToolTip source="Disable the check where Biomes and Terrains must be selected with a world coverage &gt;= 50%." translated="true" verified="false">禁用“生物群系与地形必须以不低于50%的世界覆盖率被选中”这一检查。</PLOPT_DisablePreFilterCheckToolTip>
+  <PLOPT_DisableTileBlinking source="Disable Tile Blinking" translated="true" verified="false">禁用磁贴闪烁</PLOPT_DisableTileBlinking>
+  <PLOPT_DisableTileBlinkingToolTip source="Disable tile blinking (&quot;breathing&quot;) for filtered tiles on the world map." translated="true" verified="false">在世界地图上禁用过滤后的图块闪烁（“呼吸”）。</PLOPT_DisableTileBlinkingToolTip>
+  <PLOPT_DisableTileHighlighting source="Disable Tile Highlighting" translated="true" verified="false">禁用磁贴突出显示</PLOPT_DisableTileHighlighting>
+  <PLOPT_DisableTileHighlightingToolTip source="Disable tile highlighting altogether." translated="true" verified="false">完全禁用磁贴高亮显示。</PLOPT_DisableTileHighlightingToolTip>
+  <PLOPT_FilterOptions source="Filter Options" translated="true" verified="false">筛选选项</PLOPT_FilterOptions>
+  <PLOPT_Options source="Options" translated="true" verified="false">选项</PLOPT_Options>
+  <PLOPT_ResetAllFiltersOnNewWorld source="Reset all filters on new world" translated="true" verified="false">重置新世界上的所有过滤器</PLOPT_ResetAllFiltersOnNewWorld>
+  <PLOPT_ResetAllFiltersOnNewWorldToolTip source="If ON, all filters are reset to their default state on a new generated world, otherwise the filters are kept in their previous state." translated="true" verified="false">如果启用，新生成的世界将重置所有过滤器为默认状态；否则，过滤器将保留其先前的状态。</PLOPT_ResetAllFiltersOnNewWorldToolTip>
+  <PLOPT_ShowDebugTileId source="Show Debug Tile ID" translated="true" verified="false">显示调试磁贴ID</PLOPT_ShowDebugTileId>
+  <PLOPT_ShowDebugTileIdToolTip source="Show the Debug Tile ID for the highlighted tiles." translated="true" verified="false">显示突出显示的磁贴的调试磁贴ID。</PLOPT_ShowDebugTileIdToolTip>
+  <PLOPT_ShowFilterHeaviness source="Show Filter Heaviness" translated="true" verified="false">显示过滤器重量</PLOPT_ShowFilterHeaviness>
+  <PLOPT_ShowFilterHeavinessToolTip source="Show filter heaviness (possible filter CPU calculation heaviness) on filter header in the GUI." translated="true" verified="false">在GUI中的过滤器标题上显示过滤器繁重程度（可能是过滤器CPU计算繁重程度）。</PLOPT_ShowFilterHeavinessToolTip>
+  <PLOPT_TileHighlighterOptions source="Tile Highlighter Options" translated="true" verified="false">瓷砖荧光笔选项</PLOPT_TileHighlighterOptions>
+  <PLOPT_ViewPartialOffNoSelect source="View PartialOffNoSelect" translated="true" verified="false">查看ParacalOffNoSelect</PLOPT_ViewPartialOffNoSelect>
+  <PLOPT_ViewPartialOffNoSelectToolTip source="Allow to view the PartialOffNoSelect button on the GUI for grouped three state items." translated="true" verified="false">允许在GUI上为分组的三态项显示“PartialOffNoSelect”按钮。</PLOPT_ViewPartialOffNoSelectToolTip>
 </LanguageData>
