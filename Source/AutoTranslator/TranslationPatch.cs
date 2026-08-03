@@ -22,7 +22,7 @@ internal static class TranslationPatch
         {
             return;
         }
-        // 信任官方返回值：官方已处理（命中或异常短路）不接手。
+        // 官方已翻译（命中或异常短路）不接手。
         if (__result)
         {
             return;
@@ -32,7 +32,7 @@ internal static class TranslationPatch
         {
             return;
         }
-        // 官方未翻译，但我们已经翻译过：直接把已存译文回写 keyedReplacements 让界面生效，跳过记录与重复提交。
+        // 官方未翻译：查我们是否已翻译。已翻译则回写已存译文让界面生效并直接返回，不重复记录/提交。
         if (AutoTranslationStore.IsTranslated(key)
             && AutoTranslationStore.TryGetTranslation(key, out string cached)
             && !cached.NullOrEmpty())
