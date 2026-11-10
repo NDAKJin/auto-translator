@@ -17,6 +17,10 @@
   <AutoTranslator.Volcengine>Volcengine</AutoTranslator.Volcengine>
   <AutoTranslator.Baidu>Baidu</AutoTranslator.Baidu>
   <AutoTranslator.Aliyun>Aliyun</AutoTranslator.Aliyun>
+  <AutoTranslator.OpenAICompatible>AI relay (OpenAI compatible)</AutoTranslator.OpenAICompatible>
+  <AutoTranslator.ApiBaseUrl>API base URL (/v1)</AutoTranslator.ApiBaseUrl>
+  <AutoTranslator.Model>Model</AutoTranslator.Model>
+  <AutoTranslator.ApiKey>API Key</AutoTranslator.ApiKey>
   <AutoTranslator.PlatformList>Available platforms</AutoTranslator.PlatformList>
   <AutoTranslator.CredentialTable>Credentials</AutoTranslator.CredentialTable>
   <AutoTranslator.AccessKey>Access key</AutoTranslator.AccessKey>

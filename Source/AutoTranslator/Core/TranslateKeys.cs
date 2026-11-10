@@ -23,6 +23,9 @@ public static class TranslateKeys
   public const string Volcengine = "AutoTranslator.Volcengine";
   public const string Baidu = "AutoTranslator.Baidu";
   public const string Aliyun = "AutoTranslator.Aliyun";
+  public const string ApiBaseUrl = "AutoTranslator.ApiBaseUrl";
+  public const string Model = "AutoTranslator.Model";
+  public const string ApiKey = "AutoTranslator.ApiKey";
   public const string PlatformList = "AutoTranslator.PlatformList";
   public const string CredentialTable = "AutoTranslator.CredentialTable";
   public const string AccessKey = "AutoTranslator.AccessKey";

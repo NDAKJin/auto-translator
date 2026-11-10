@@ -70,7 +70,7 @@ public static class AutoTranslatorEngine
             {
                 continue;
             }
-            if (!CreatePlatform(type, cred.AccessKey, cred.SecretKey, out TranslatePlatform platform))
+            if (!CreatePlatform(type, cred, out TranslatePlatform platform))
             {
                 AutoLog.Warn($"平台 {cred.PlatformId} 实例化失败，已跳过");
                 continue;
@@ -82,12 +82,23 @@ public static class AutoTranslatorEngine
         AutoLog.Info($"翻译源构建完成：{Dispatcher.Count} 个可用平台");
     }
 
-    /// <summary>反射构造平台实例（访问键/密钥），失败返回 false。</summary>
+    /// <summary>按平台配置构造翻译源，配置不完整时跳过。</summary>
     private static bool CreatePlatform(
-        System.Type type, string accessKey, string secretKey, out TranslatePlatform platform)
+        System.Type type, PlatformCredential cred, out TranslatePlatform platform)
     {
         platform = null;
-        var obj = System.Activator.CreateInstance(type, accessKey ?? string.Empty, secretKey ?? string.Empty);
+        if (type == typeof(OpenAICompatibleTranslate))
+        {
+            if (string.IsNullOrWhiteSpace(cred.AccessKey) || string.IsNullOrWhiteSpace(cred.Model)
+                || !OpenAICompatibleTranslate.TryCreateEndpoint(cred.ApiBaseUrl, out _))
+            {
+                AutoLog.Warn("AI 中转站配置不完整或接口地址无效，请检查 API Key、接口地址和模型名");
+                return false;
+            }
+            platform = new OpenAICompatibleTranslate(cred.AccessKey, cred.ApiBaseUrl, cred.Model);
+            return true;
+        }
+        var obj = System.Activator.CreateInstance(type, cred.AccessKey ?? string.Empty, cred.SecretKey ?? string.Empty);
         if (obj is TranslatePlatform p)
         {
             platform = p;

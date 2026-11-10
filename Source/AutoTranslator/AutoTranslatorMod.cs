@@ -42,9 +42,9 @@ public class AutoTranslatorMod : Mod
     public override void DoSettingsWindowContents(Rect inRect)
     {
         const float ScrollBarMargin = 16f;
-        const float ViewHeight = 720f;
+        float viewHeight = 720f + (settings.HasPlatform(OpenAICompatibleTranslate.PlatformNameKey) ? 150f : 0f);
         Rect outRect = inRect;
-        Rect viewRect = new Rect(0f, 0f, inRect.width - ScrollBarMargin, ViewHeight);
+        Rect viewRect = new Rect(0f, 0f, inRect.width - ScrollBarMargin, viewHeight);
 
         // 确保所有已注册平台都有凭据对象（升级旧存档/新增平台时补齐），再读取勾选状态。
         settings.EnsureAllPlatforms();
@@ -114,6 +114,17 @@ public class AutoTranslatorMod : Mod
                         ? key.Translate()
                         : cred.PlatformId;
                     listing.Label(platformLabel);
+
+                    if (cred.PlatformId == OpenAICompatibleTranslate.PlatformNameKey)
+                    {
+                        cred.ApiBaseUrl = listing.TextEntryLabeled(TranslateKeys.ApiBaseUrl.Translate(), cred.ApiBaseUrl ?? string.Empty);
+                        cred.Model = listing.TextEntryLabeled(TranslateKeys.Model.Translate(), cred.Model ?? string.Empty);
+                        cred.AccessKey = DrawPasswordField(
+                            listing, TranslateKeys.ApiKey.Translate(), cred.AccessKey, ref cred.showAccessKey);
+                        listing.Gap(6f);
+                        DrawCredentialActionButtons(listing, cred);
+                        continue;
+                    }
 
                     // 访问键：真实值存 cred.AccessKey（label 字段，隐藏），输入框打码/明文可切换，改后同步写回。
                     cred.AccessKey = DrawPasswordField(

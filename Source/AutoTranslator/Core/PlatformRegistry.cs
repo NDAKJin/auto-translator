@@ -17,7 +17,8 @@ public static class PlatformRegistry
     [
         VolcengineTranslate.PlatformNameKey,
         AliyunTranslate.PlatformNameKey,
-        BaiduTranslate.PlatformNameKey
+        BaiduTranslate.PlatformNameKey,
+        OpenAICompatibleTranslate.PlatformNameKey
     ];
 
     /// <summary>
@@ -28,7 +29,8 @@ public static class PlatformRegistry
     {
         { VolcengineTranslate.PlatformNameKey, VolcengineTranslate.PlatformNameKey },
         { AliyunTranslate.PlatformNameKey, AliyunTranslate.PlatformNameKey },
-        { BaiduTranslate.PlatformNameKey, BaiduTranslate.PlatformNameKey }
+        { BaiduTranslate.PlatformNameKey, BaiduTranslate.PlatformNameKey },
+        { OpenAICompatibleTranslate.PlatformNameKey, OpenAICompatibleTranslate.PlatformNameKey }
     };
 
     /// <summary>
@@ -39,6 +41,7 @@ public static class PlatformRegistry
     {
         { VolcengineTranslate.PlatformNameKey, typeof(VolcengineTranslate) },
         { AliyunTranslate.PlatformNameKey, typeof(AliyunTranslate) },
-        { BaiduTranslate.PlatformNameKey, typeof(BaiduTranslate) }
+        { BaiduTranslate.PlatformNameKey, typeof(BaiduTranslate) },
+        { OpenAICompatibleTranslate.PlatformNameKey, typeof(OpenAICompatibleTranslate) }
     };
 }

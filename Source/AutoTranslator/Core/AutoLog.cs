@@ -114,8 +114,7 @@ public static class AutoLog
       Verse.Log.Message(full);
     }
 #else
-    if (once) Debug.WriteLine($"[{level}] {full}");
-    else Debug.WriteLine($"[{level}] {full}");
+    System.Diagnostics.Debug.WriteLine($"[{level}] {full}");
 #endif
   }
 

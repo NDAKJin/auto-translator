@@ -17,6 +17,10 @@
   <AutoTranslator.Volcengine>火山引擎</AutoTranslator.Volcengine>
   <AutoTranslator.Baidu>百度翻译</AutoTranslator.Baidu>
   <AutoTranslator.Aliyun>阿里云翻译</AutoTranslator.Aliyun>
+  <AutoTranslator.OpenAICompatible>AI 中转站（兼容 OpenAI）</AutoTranslator.OpenAICompatible>
+  <AutoTranslator.ApiBaseUrl>接口地址（/v1）</AutoTranslator.ApiBaseUrl>
+  <AutoTranslator.Model>模型名</AutoTranslator.Model>
+  <AutoTranslator.ApiKey>API Key</AutoTranslator.ApiKey>
   <AutoTranslator.PlatformList>可用平台</AutoTranslator.PlatformList>
   <AutoTranslator.CredentialTable>凭据</AutoTranslator.CredentialTable>
   <AutoTranslator.AccessKey>访问键</AutoTranslator.AccessKey>

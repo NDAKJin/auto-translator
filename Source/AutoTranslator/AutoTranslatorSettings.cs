@@ -72,6 +72,8 @@ public class AutoTranslatorSettings : ModSettings
         {
             cred.AccessKey = string.Empty;
             cred.SecretKey = string.Empty;
+            cred.ApiBaseUrl = string.Empty;
+            cred.Model = string.Empty;
         }
     }
 
@@ -83,7 +85,11 @@ public class AutoTranslatorSettings : ModSettings
             if (credentials.All(c => c.PlatformId != platformId))
             {
                 // 与 PlatformCredential.enabled 默认值一致（true），避免首次进入时所有平台被默认禁用导致 Dispatcher.Count == 0。
-                credentials.Add(new PlatformCredential { PlatformId = platformId, enabled = true });
+                credentials.Add(new PlatformCredential
+                {
+                    PlatformId = platformId,
+                    enabled = platformId != OpenAICompatibleTranslate.PlatformNameKey
+                });
             }
         }
     }
@@ -119,6 +125,10 @@ public class PlatformCredential : IExposable
     /// <summary>存档用混淆串（仅落盘，代码不直接读）。</summary>
     private string secretKeyObf;
 
+    /// <summary>OpenAI 兼容接口的地址和模型名；非密钥，直接持久化。</summary>
+    public string ApiBaseUrl = string.Empty;
+    public string Model = string.Empty;
+
     /// <summary>访问键输入框是否显示明文（运行时临时状态，不落盘）。</summary>
     public bool showAccessKey;
 
@@ -145,5 +155,7 @@ public class PlatformCredential : IExposable
         Scribe_Values.Look(ref enabled, "enabled", true);
         Scribe_Values.Look(ref accessKeyObf, "accessKey");
         Scribe_Values.Look(ref secretKeyObf, "secretKey");
+        Scribe_Values.Look(ref ApiBaseUrl, "apiBaseUrl", string.Empty);
+        Scribe_Values.Look(ref Model, "model", string.Empty);
     }
 }

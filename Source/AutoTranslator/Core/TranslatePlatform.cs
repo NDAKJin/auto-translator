@@ -29,6 +29,9 @@ public abstract class TranslatePlatform : ITranslationPlatform
     /// <summary>Secret Key</summary>
     protected string SecretKey { get; }
 
+    /// <summary>多数平台需要双密钥；单 API Key 平台可重写。</summary>
+    protected virtual bool HasCredentials => !string.IsNullOrWhiteSpace(AccessKey) && !string.IsNullOrWhiteSpace(SecretKey);
+
     /// <summary>平台标识（带前缀的完整标志，如 "AutoTranslator.Baidu"）。</summary>
     public abstract string PlatformName { get; }
 
@@ -41,7 +44,7 @@ public abstract class TranslatePlatform : ITranslationPlatform
     /// </summary>
     public TranslationResult Translate(string source, string target, string text)
     {
-        if (string.IsNullOrEmpty(AccessKey) || string.IsNullOrEmpty(SecretKey))
+        if (!HasCredentials)
         {
             return FailLog("凭证未配置", TranslationErrorCode.InvalidRequest, null);
         }

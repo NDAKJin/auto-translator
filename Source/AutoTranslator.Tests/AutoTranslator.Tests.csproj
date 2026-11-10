@@ -25,6 +25,10 @@
     <Compile Include="..\AutoTranslator\Core\Obfuscation.cs" Link="LinkedSources\Obfuscation.cs" />
     <Compile Include="..\AutoTranslator\Core\TranslationResult.cs" Link="LinkedSources\TranslationResult.cs" />
     <Compile Include="..\AutoTranslator\Core\TranslationErrorCode.cs" Link="LinkedSources\TranslationErrorCode.cs" />
+    <Compile Include="..\AutoTranslator\Core\AutoLog.cs" Link="LinkedSources\AutoLog.cs" />
+    <Compile Include="..\AutoTranslator\Core\ITranslationPlatform.cs" Link="LinkedSources\ITranslationPlatform.cs" />
+    <Compile Include="..\AutoTranslator\Core\TranslatePlatform.cs" Link="LinkedSources\TranslatePlatform.cs" />
+    <Compile Include="..\AutoTranslator\Core\OpenAICompatibleTranslate.cs" Link="LinkedSources\OpenAICompatibleTranslate.cs" />
   </ItemGroup>
 
 </Project>
