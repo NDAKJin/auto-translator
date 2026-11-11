@@ -1,5 +1,7 @@
 # AutoTranslator
 
+本项目基于 [nomadicooer/auto-translator](https://gitee.com/nomadicooer/auto-translator) 进行二次开发。感谢原作者 nomadicooer 提供基础项目和实现思路。
+
 RimWorld 1.6 的自动翻译 Mod。它处理缺少当前语言译文的 Keyed 文本、其他 Mod 的 Def 名称和描述，以及界面实际绘制的非目标语言文本。译文会写回当前游戏界面；开启翻译记录后，还会保存到当前语言的翻译文件。
 
 目前只支持兼容 OpenAI Chat Completions 的 API，包括按该格式提供服务的 AI 中转站。使用翻译服务可能产生费用。
