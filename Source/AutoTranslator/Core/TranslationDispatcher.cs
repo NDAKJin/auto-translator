@@ -7,21 +7,15 @@ namespace nomadicooer.AutoTranslator;
 /// <summary>
 /// 翻译调度器：协调翻译请求与接口状态。
 /// 统一负责节流与限流重试，并根据各翻译源返回的 TranslationResult 错误码，
-/// 对连续失败的源实施"关禁闭"（冷却）策略。
 /// 各翻译源类只负责发起请求并返回结果，不含任何节流/重试逻辑。
 /// 调度器自身实现 <see cref="ITranslationPlatform"/>（持有翻译源而非继承基类）。
 /// </summary>
 public class TranslationDispatcher : ITranslationPlatform
 {
     private const string DispatcherNameKey = "AutoTranslator.Dispatcher";
+    private const int FailureAlertThreshold = 3;
 
     // ===== 可配置阈值（后续接入设置页；当前为字段默认值）=====
-    /// <summary>连续失败次数超过该阈值后，将源关禁闭（进入冷却）。可由设置页修改。</summary>
-    public int DisableThreshold = 3;
-
-    /// <summary>关禁闭时长（毫秒）。冷却结束后自动恢复。可由设置页修改。</summary>
-    public int CooldownMs = 60000;
-
     /// <summary>遇到限流（RateLimited）时对该源的最大重试次数。可由设置页修改。</summary>
     public int MaxRetryOnRateLimit = 3;
 
@@ -44,10 +38,9 @@ public class TranslationDispatcher : ITranslationPlatform
 
     private readonly List<ITranslationPlatform> _sources = new List<ITranslationPlatform>();
 
-    // 每个翻译源的运行时状态：连续失败计数、关禁闭截止时间戳、上次请求时间戳。
-    private readonly Dictionary<ITranslationPlatform, int> _failCounts = new Dictionary<ITranslationPlatform, int>();
-    private readonly Dictionary<ITranslationPlatform, long> _cooldownUntil = new Dictionary<ITranslationPlatform, long>();
+    // 每个翻译源的上次请求时间戳。
     private readonly Dictionary<ITranslationPlatform, long> _lastRequestTicks = new Dictionary<ITranslationPlatform, long>();
+    private readonly Dictionary<ITranslationPlatform, int> _consecutiveFailures = new Dictionary<ITranslationPlatform, int>();
     private readonly object _stateLock = new object();
 
     /// <summary>
@@ -86,9 +79,8 @@ public class TranslationDispatcher : ITranslationPlatform
             }
 
             _sources.Add(source);
-            _failCounts[source] = 0;
-            _cooldownUntil[source] = 0;
             _lastRequestTicks[source] = 0;
+            _consecutiveFailures[source] = 0;
         }
     }
 
@@ -108,8 +100,7 @@ public class TranslationDispatcher : ITranslationPlatform
     public string GetLangCode(string name) => null;
 
     /// <summary>
-    /// 按注册顺序协调各翻译源：跳过关禁闭中的源，对可用源先限流重试，
-    /// 成功即返回；失败则累计计数，超过阈值则关禁闭该源并转下一个源。
+    /// 按注册顺序协调各翻译源，成功即返回；失败则尝试下一个源。
     /// 全部失败返回最后一个源的结果。
     /// </summary>
     /// <param name="source">源语言（RimWorld 语言名，如 "English"）。</param>
@@ -139,26 +130,32 @@ public class TranslationDispatcher : ITranslationPlatform
         {
             ITranslationPlatform platform = snapshot[(start + i) % snapshot.Count];
 
-            if (IsInCooldown(platform))
-            {
-                AutoLog.Info("[AutoTranslator] 翻译源 " + platform.PlatformName + " 处于关禁闭期，跳过。");
-                continue;
-            }
-
             EnsureMinInterval(platform);
 
             TranslationResult result = TryWithRateLimitRetry(platform, source, target, text);
+            RecordResult(platform, result);
             if (result.Success)
             {
-                ResetFail(platform);
                 return result;
             }
 
             last = result;
-            RegisterFail(platform);
         }
 
         return last ?? TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "所有翻译源均不可用");
+    }
+
+    private void RecordResult(ITranslationPlatform platform, TranslationResult result)
+    {
+        bool alert;
+        lock (_stateLock)
+        {
+            int failures = result.Success ? 0 : _consecutiveFailures[platform] + 1;
+            _consecutiveFailures[platform] = failures;
+            alert = failures == FailureAlertThreshold;
+        }
+        if (alert)
+            AutoLog.ApiFailure("翻译接口连续失败 3 次，请检查接口地址、模型、密钥和网络。错误类型: " + result.ErrorCode);
     }
 
     /// <summary>
@@ -211,43 +208,4 @@ public class TranslationDispatcher : ITranslationPlatform
         }
     }
 
-    /// <summary>
-    /// 登记一次失败：连续失败计数 +1，超过 DisableThreshold 则将该源关禁闭 CooldownMs。
-    /// </summary>
-    private void RegisterFail(ITranslationPlatform platform)
-    {
-        lock (_stateLock)
-        {
-            int count = 0;
-            _failCounts.TryGetValue(platform, out count);
-            count++;
-            _failCounts[platform] = count;
-            if (count > DisableThreshold)
-            {
-                _cooldownUntil[platform] = DateTime.UtcNow.Ticks + CooldownMs * TimeSpan.TicksPerMillisecond;
-                AutoLog.Warn("[AutoTranslator] 翻译源 " + platform.PlatformName
-                                + " 连续失败 " + count + " 次，关禁闭 " + CooldownMs + "ms。");
-            }
-        }
-    }
-
-    /// <summary>重置指定源的失败计数与关禁闭状态（成功翻译后调用）。</summary>
-    private void ResetFail(ITranslationPlatform platform)
-    {
-        lock (_stateLock)
-        {
-            _failCounts[platform] = 0;
-            _cooldownUntil[platform] = 0;
-        }
-    }
-
-    /// <summary>判断指定源当前是否处于关禁闭（冷却）期。</summary>
-    private bool IsInCooldown(ITranslationPlatform platform)
-    {
-        lock (_stateLock)
-        {
-            long until;
-            return _cooldownUntil.TryGetValue(platform, out until) && until > DateTime.UtcNow.Ticks;
-        }
-    }
 }

@@ -1,4 +1,5 @@
 using RimWorld;
+using System.Threading.Tasks;
 using UnityEngine;
 using Verse;
 using Verse.Sound;
@@ -38,6 +39,8 @@ public class AutoTranslatorMod : Mod
     /// <summary>设置页滚动视图的纵向位移状态（跨帧保留）。</summary>
     private Vector2 settingsScrollPos;
     private float settingsContentHeight = 600f;
+    private Task<TranslationResult> connectionTest;
+    private string testUrl, testModel, testKey;
 
     public override void DoSettingsWindowContents(Rect inRect)
     {
@@ -100,6 +103,8 @@ public class AutoTranslatorMod : Mod
                 listing, TranslateKeys.ApiKey.Translate(), cred.AccessKey, ref cred.showAccessKey);
             listing.Gap(6f);
             DrawCredentialActionButtons(listing, cred);
+            listing.Gap(6f);
+            DrawConnectionTest(listing, cred);
 
             listing.Gap(12f);
             settingsContentHeight = listing.CurHeight + 16f;
@@ -111,6 +116,40 @@ public class AutoTranslatorMod : Mod
             AutoLog.Error("[AutoTranslator] DoSettingsWindowContents 异常: " + ex);
         }
 
+    }
+
+    private void DrawConnectionTest(Listing_Standard listing, PlatformCredential cred)
+    {
+        bool running = connectionTest != null && !connectionTest.IsCompleted;
+        if (listing.ButtonText((running ? TranslateKeys.TestConnectionRunning : TranslateKeys.TestConnection).Translate()) && !running)
+        {
+            testUrl = cred.ApiBaseUrl ?? string.Empty;
+            testModel = cred.Model ?? string.Empty;
+            testKey = cred.AccessKey ?? string.Empty;
+            var platform = new OpenAICompatibleTranslate(testKey, testUrl, testModel);
+            connectionTest = Task.Run(() => platform.TestConnection());
+        }
+
+        if (connectionTest == null || !connectionTest.IsCompleted) return;
+        if (testUrl != (cred.ApiBaseUrl ?? string.Empty) || testModel != (cred.Model ?? string.Empty)
+            || testKey != (cred.AccessKey ?? string.Empty))
+        {
+            connectionTest = null;
+            testKey = null;
+            return;
+        }
+        TranslationResult result = connectionTest.Status == TaskStatus.RanToCompletion ? connectionTest.Result : null;
+        string status = result != null && result.Success
+            ? TranslateKeys.TestConnectionSuccess.Translate().ToString()
+            : TranslateKeys.TestConnectionFailure.Translate().ToString();
+        if (result != null && !result.Success && !string.IsNullOrWhiteSpace(result.RawError))
+        {
+            string error = result.RawError;
+            if (!string.IsNullOrEmpty(testKey)) error = error.Replace(testKey, "***");
+            if (error.Length > 300) error = error.Substring(0, 300) + "...";
+            status += "\n" + error;
+        }
+        listing.Label(status);
     }
 
     /// <summary>绘制单个凭据的保存 / 恢复默认按钮，居中并排。</summary>

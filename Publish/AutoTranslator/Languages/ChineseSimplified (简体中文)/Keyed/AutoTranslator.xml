@@ -14,6 +14,10 @@
   <AutoTranslator.ApiKey>API Key</AutoTranslator.ApiKey>
   <AutoTranslator.ResetDefaults>恢复默认设置</AutoTranslator.ResetDefaults>
   <AutoTranslator.SaveSettings>保存设置</AutoTranslator.SaveSettings>
+  <AutoTranslator.TestConnection>测试连接</AutoTranslator.TestConnection>
+  <AutoTranslator.TestConnectionRunning>正在测试连接...</AutoTranslator.TestConnectionRunning>
+  <AutoTranslator.TestConnectionSuccess>测试成功：接口已返回模型内容。</AutoTranslator.TestConnectionSuccess>
+  <AutoTranslator.TestConnectionFailure>测试失败，请检查接口配置：</AutoTranslator.TestConnectionFailure>
   <AutoTranslator.ShowPassword>显示密码</AutoTranslator.ShowPassword>
   <AutoTranslator.HidePassword>隐藏密码</AutoTranslator.HidePassword>
   <AutoTranslator.TranslationFilePathLabel>翻译文件路径</AutoTranslator.TranslationFilePathLabel>

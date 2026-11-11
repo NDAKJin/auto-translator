@@ -11,6 +11,67 @@ namespace AutoTranslator.Tests;
 
 public class OpenAICompatibleTranslateTests
 {
+    [Fact]
+    public void TimeoutIsReportedForConnectionAndTranslation()
+    {
+        using var client = new HttpClient(new ThrowingHandler(new TaskCanceledException()));
+        var platform = new OpenAICompatibleTranslate("key", "https://relay.example/v1", "model", client);
+        Assert.Contains("API 调用超时", platform.TestConnection().RawError);
+        Assert.Contains("API 调用超时", platform.Translate("English", "ChineseSimplified", "Hello").RawError);
+    }
+    [Fact]
+    public void EncodingErrorRetriesUsingDirectClient()
+    {
+        using var primary = new HttpClient(new ThrowingHandler(new ArgumentException("Illegal byte sequence encounted in the input.")));
+        var fallback = new StubHandler(HttpStatusCode.OK, "{\"choices\":[{\"message\":{\"content\":\"Hello\"}}]}");
+        using var direct = new HttpClient(fallback);
+        var platform = new OpenAICompatibleTranslate("key", "https://relay.example/v1", "model", primary, direct);
+        Assert.True(platform.TestConnection().Success);
+        Assert.NotNull(fallback.Url);
+    }
+
+    [Fact]
+    public void OtherErrorsDoNotRetryDirectly()
+    {
+        using var primary = new HttpClient(new ThrowingHandler(new HttpRequestException("offline")));
+        var fallback = new StubHandler(HttpStatusCode.OK, "{}");
+        using var direct = new HttpClient(fallback);
+        var platform = new OpenAICompatibleTranslate("key", "https://relay.example/v1", "model", primary, direct);
+        Assert.False(platform.TestConnection().Success);
+        Assert.Null(fallback.Url);
+    }
+
+    private sealed class ThrowingHandler : HttpMessageHandler
+    {
+        private readonly Exception exception;
+        public ThrowingHandler(Exception exception) => this.exception = exception;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => Task.FromException<HttpResponseMessage>(exception);
+    }
+
+    [Theory]
+    [InlineData("Hello!")]
+    [InlineData("请提供需要翻译的文本")]
+    public void ConnectionTestAcceptsAnyNonemptyModelContent(string content)
+    {
+        var response = JsonSerializer.Serialize(new { choices = new[] { new { message = new { content } } } });
+        var handler = new StubHandler(HttpStatusCode.OK, response);
+        using var client = new HttpClient(handler);
+        var platform = new OpenAICompatibleTranslate("test-key", "https://relay.example/v1", "test-model", client);
+        Assert.True(platform.TestConnection().Success);
+        using JsonDocument request = JsonDocument.Parse(handler.Body);
+        Assert.False(request.RootElement.TryGetProperty("response_format", out _));
+        Assert.Equal("Hello", request.RootElement.GetProperty("messages")[0].GetProperty("content").GetString());
+    }
+
+    [Fact]
+    public void ConnectionTestRejectsEmptyResponseAndHttpFailure()
+    {
+        using var emptyClient = new HttpClient(new StubHandler(HttpStatusCode.OK, "{\"choices\":[{\"message\":{\"content\":\"\"}}]}"));
+        using var errorClient = new HttpClient(new StubHandler(HttpStatusCode.Unauthorized, "{}"));
+        Assert.False(new OpenAICompatibleTranslate("key", "https://relay.example/v1", "model", emptyClient).TestConnection().Success);
+        Assert.False(new OpenAICompatibleTranslate("key", "https://relay.example/v1", "model", errorClient).TestConnection().Success);
+    }
     [Theory]
     [InlineData("https://relay.example/v1", "https://relay.example/v1/chat/completions")]
     [InlineData("https://relay.example/v1/chat/completions", "https://relay.example/v1/chat/completions")]

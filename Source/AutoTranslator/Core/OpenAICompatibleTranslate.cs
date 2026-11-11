@@ -8,6 +8,7 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace nomadicooer.AutoTranslator;
 
@@ -18,27 +19,83 @@ public class OpenAICompatibleTranslate : TranslatePlatform
 
     private static readonly HttpClient SharedClient = new()
     {
-        Timeout = TimeSpan.FromSeconds(20)
+        Timeout = TimeSpan.FromSeconds(60)
+    };
+    private static readonly HttpClient DirectClient = new(new HttpClientHandler { UseProxy = false })
+    {
+        Timeout = TimeSpan.FromSeconds(60)
     };
 
     private readonly string baseUrl;
     private readonly string model;
     private readonly HttpClient client;
+    private readonly HttpClient fallbackClient;
 
     public OpenAICompatibleTranslate(string apiKey, string baseUrl, string model)
-        : this(apiKey, baseUrl, model, SharedClient)
+        : this(apiKey, baseUrl, model, SharedClient, DirectClient)
     {
     }
 
-    internal OpenAICompatibleTranslate(string apiKey, string baseUrl, string model, HttpClient client)
+    internal OpenAICompatibleTranslate(string apiKey, string baseUrl, string model, HttpClient client, HttpClient fallbackClient = null)
         : base(apiKey ?? string.Empty)
     {
         this.baseUrl = baseUrl;
         this.model = model;
         this.client = client;
+        this.fallbackClient = fallbackClient;
     }
 
     public override string PlatformName => PlatformNameKey;
+
+    public TranslationResult TestConnection()
+    {
+        if (string.IsNullOrWhiteSpace(AccessKey) || string.IsNullOrWhiteSpace(model)
+            || !TryCreateEndpoint(baseUrl, out Uri endpoint))
+            return TranslationResult.Fail(string.Empty, TranslationErrorCode.InvalidRequest, "请检查 API Key、模型名和接口地址");
+
+        string stage = "构建请求";
+        try
+        {
+            var payload = new ChatRequest
+            {
+                Model = model.Trim(),
+                Messages = new[] { new ChatMessage { Role = "user", Content = "Hello" } }
+            };
+            stage = "发送请求";
+            using HttpResponseMessage response = Send(endpoint, payload);
+            stage = "读取响应";
+            string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            if (response.StatusCode == HttpStatusCode.RequestTimeout)
+            {
+                AutoLog.ApiFailure("API 调用超时（HTTP 408）");
+                return TranslationResult.Fail(string.Empty, TranslationErrorCode.ServiceUnavailable, "API 调用超时（HTTP 408）");
+            }
+            if (!response.IsSuccessStatusCode)
+                return TranslationResult.Fail(string.Empty, TranslationErrorCode.InvalidRequest, "HTTP " + (int)response.StatusCode);
+            stage = "解析响应";
+            ChatResponse result = Deserialize<ChatResponse>(body);
+            string content = result?.Choices != null && result.Choices.Length > 0 ? result.Choices[0]?.Message?.Content : null;
+            return string.IsNullOrWhiteSpace(content)
+                ? TranslationResult.Fail(string.Empty, TranslationErrorCode.ServiceUnavailable, "接口未返回模型内容")
+                : TranslationResult.Ok(content);
+        }
+        catch (TaskCanceledException)
+        {
+            AutoLog.ApiFailure("API 调用超时（60 秒）");
+            return TranslationResult.Fail(string.Empty, TranslationErrorCode.ServiceUnavailable, "API 调用超时（60 秒）");
+        }
+        catch (Exception ex)
+        {
+            var diagnostic = new StringBuilder("连接测试异常阶段: ").Append(stage);
+            for (Exception current = ex; current != null; current = current.InnerException)
+            {
+                diagnostic.Append("\n").Append(current.GetType().FullName);
+                if (!string.IsNullOrEmpty(current.StackTrace)) diagnostic.Append("\n").Append(current.StackTrace);
+            }
+            AutoLog.ApiFailure(diagnostic.ToString());
+            return TranslationResult.Fail(string.Empty, TranslationErrorCode.ServiceUnavailable, stage + "失败 (" + ex.GetType().Name + "): " + ex.Message);
+        }
+    }
 
     public override string GetLangCode(string rimWorldLangFolderName)
     {
@@ -107,11 +164,13 @@ public class OpenAICompatibleTranslate : TranslatePlatform
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AccessKey.Trim());
-            request.Content = new StringContent(Serialize(payload), Encoding.UTF8, "application/json");
-            using HttpResponseMessage response = client.SendAsync(request).GetAwaiter().GetResult();
+            using HttpResponseMessage response = Send(endpoint, payload);
             string body = response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+            if (response.StatusCode == HttpStatusCode.RequestTimeout)
+            {
+                AutoLog.ApiFailure("API 调用超时（HTTP 408）");
+                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "API 调用超时（HTTP 408）");
+            }
             if (!response.IsSuccessStatusCode)
             {
                 string error = ReadError(body);
@@ -160,11 +219,42 @@ public class OpenAICompatibleTranslate : TranslatePlatform
             }
             return TranslationResult.Ok(translated);
         }
+        catch (TaskCanceledException)
+        {
+            AutoLog.ApiFailure("API 调用超时（60 秒）");
+            return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "API 调用超时（60 秒）");
+        }
         catch (Exception ex)
         {
             AutoLog.Warn("AI 中转站请求失败", ex);
             return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "AI 中转站请求失败: " + ex.Message);
         }
+    }
+
+    private HttpResponseMessage Send(Uri endpoint, ChatRequest payload)
+    {
+        string json = Serialize(payload);
+        try { return SendWith(client, endpoint, json); }
+        catch (Exception ex) when (fallbackClient != null && IsInvalidByteSequence(ex))
+        {
+            return SendWith(fallbackClient, endpoint, json);
+        }
+    }
+
+    private HttpResponseMessage SendWith(HttpClient target, Uri endpoint, string json)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", AccessKey.Trim());
+        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        return target.SendAsync(request).GetAwaiter().GetResult();
+    }
+
+    private static bool IsInvalidByteSequence(Exception exception)
+    {
+        for (Exception current = exception; current != null; current = current.InnerException)
+            if (current is ArgumentException && current.Message.IndexOf("Illegal byte sequence", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+        return false;
     }
 
     private static bool TryParseDecision(string value, out TranslationDecision decision)
@@ -275,7 +365,7 @@ public class OpenAICompatibleTranslate : TranslatePlatform
         [DataMember(Name = "messages")]
         public ChatMessage[] Messages;
 
-        [DataMember(Name = "response_format")]
+        [DataMember(Name = "response_format", EmitDefaultValue = false)]
         public ResponseFormat ResponseFormat;
     }
 

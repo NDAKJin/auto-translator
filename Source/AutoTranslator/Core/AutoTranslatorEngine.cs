@@ -35,7 +35,7 @@ public static class AutoTranslatorEngine
     private static readonly TranslationFailureTracker failureTracker = new();
 
     /// <summary>队列积压上限：超出则丢弃新请求，避免打开大界面时无限堆积。</summary>
-    private const int MaxQueueLength = 200;
+    private const int MaxQueueLength = 2000;
     private const int WorkerCount = 3;
 
     /// <summary>一条待执行的后台翻译任务。</summary>
@@ -460,8 +460,6 @@ public static class AutoTranslatorEngine
                 if (generation != cacheGeneration) return result;
                 if (!result.Success)
                 {
-                    // A dispatcher in cooldown did not contact the API, so it is not an attempt.
-                    if (result.RawError == "所有翻译源均不可用") return result;
                     if (failureTracker.Record(target, source) < TranslationFailureTracker.Limit) return result;
                     AutoLog.Warn("同一文本翻译失败 3 次，保持原文并停止重试。");
                     string unchanged = SourceTranslationCache.Remember(target, source, source);

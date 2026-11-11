@@ -203,6 +203,18 @@ public static class AutoLog
     }
   }
 
+  /// <summary>Report repeated API failures even when translation logging is disabled.</summary>
+  public static void ApiFailure(string text)
+  {
+    string full = Prefix + text;
+    if (EnabledToFile) AppendToFile($"[{Now}] ERROR {full}");
+#if RIMWORLD
+    Verse.LongEventHandler.ExecuteWhenFinished(() => Verse.Log.Error(full));
+#else
+    System.Diagnostics.Debug.WriteLine("[Error] " + full);
+#endif
+  }
+
   /// <summary>错误级（带异常）：异常按 CompactException 摘要或展开。</summary>
   public static void Error(string text, Exception ex)
   {

@@ -19,6 +19,10 @@ public static class TranslateKeys
   public const string ApiKey = "AutoTranslator.ApiKey";
   public const string ResetDefaults = "AutoTranslator.ResetDefaults";
   public const string SaveSettings = "AutoTranslator.SaveSettings";
+  public const string TestConnection = "AutoTranslator.TestConnection";
+  public const string TestConnectionRunning = "AutoTranslator.TestConnectionRunning";
+  public const string TestConnectionSuccess = "AutoTranslator.TestConnectionSuccess";
+  public const string TestConnectionFailure = "AutoTranslator.TestConnectionFailure";
   public const string ShowPassword = "AutoTranslator.ShowPassword";
   public const string HidePassword = "AutoTranslator.HidePassword";
   public const string TranslationFilePath = "AutoTranslator.TranslationFilePath";

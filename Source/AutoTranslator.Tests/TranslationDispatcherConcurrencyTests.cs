@@ -12,6 +12,27 @@ namespace AutoTranslator.Tests;
 public class TranslationDispatcherConcurrencyTests
 {
     [Fact]
+    public void ConsecutiveFailuresDoNotDisablePlatform()
+    {
+        var platform = new FailingPlatform();
+        var dispatcher = new TranslationDispatcher(new[] { platform }) { MinIntervalMs = 0, MaxRetryOnRateLimit = 0 };
+        for (int i = 0; i < 6; i++) Assert.False(dispatcher.Translate("English", "ChineseSimplified", "text").Success);
+        Assert.Equal(6, platform.Calls);
+    }
+
+    private sealed class FailingPlatform : ITranslationPlatform
+    {
+        public int Calls { get; private set; }
+        public string PlatformName => "test";
+        public string GetLangCode(string name) => name;
+        public TranslationResult Translate(string source, string target, string text)
+        {
+            Calls++;
+            return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "failed");
+        }
+    }
+
+    [Fact]
     public async Task CallsOverlapAndRespectPlatformStartInterval()
     {
         using var platform = new BlockingPlatform(3);

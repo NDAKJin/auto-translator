@@ -14,6 +14,10 @@
   <AutoTranslator.ApiKey>API Key</AutoTranslator.ApiKey>
   <AutoTranslator.ResetDefaults>Reset to defaults</AutoTranslator.ResetDefaults>
   <AutoTranslator.SaveSettings>Save settings</AutoTranslator.SaveSettings>
+  <AutoTranslator.TestConnection>Test connection</AutoTranslator.TestConnection>
+  <AutoTranslator.TestConnectionRunning>Testing connection...</AutoTranslator.TestConnectionRunning>
+  <AutoTranslator.TestConnectionSuccess>Test successful: the API returned a model response.</AutoTranslator.TestConnectionSuccess>
+  <AutoTranslator.TestConnectionFailure>Test failed. Check the API configuration:</AutoTranslator.TestConnectionFailure>
   <AutoTranslator.ShowPassword>Show password</AutoTranslator.ShowPassword>
   <AutoTranslator.HidePassword>Hide password</AutoTranslator.HidePassword>
   <AutoTranslator.TranslationFilePathLabel>Translation file path</AutoTranslator.TranslationFilePathLabel>
