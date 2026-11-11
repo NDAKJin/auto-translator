@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using RimWorld;
 using UnityEngine;
 using Verse;
@@ -34,27 +32,22 @@ public class AutoTranslatorMod : Mod
     {
         Instance = this;
         settings = GetSettings<AutoTranslatorSettings>();
+        settings.EnsureOpenAIPlatform();
     }
 
     /// <summary>设置页滚动视图的纵向位移状态（跨帧保留）。</summary>
     private Vector2 settingsScrollPos;
+    private float settingsContentHeight = 600f;
 
     public override void DoSettingsWindowContents(Rect inRect)
     {
         const float ScrollBarMargin = 16f;
-        float viewHeight = 720f + (settings.HasPlatform(OpenAICompatibleTranslate.PlatformNameKey) ? 150f : 0f);
+        float viewHeight = UnityEngine.Mathf.Max(inRect.height, settingsContentHeight);
         Rect outRect = inRect;
         Rect viewRect = new Rect(0f, 0f, inRect.width - ScrollBarMargin, viewHeight);
 
-        // 确保所有已注册平台都有凭据对象（升级旧存档/新增平台时补齐），再读取勾选状态。
-        settings.EnsureAllPlatforms();
-
-        // 先收集用户在平台列表上的勾选状态，避免 listing 渲染期间增删 Credentials 触发控件错乱。
-        var platformChecks = new Dictionary<string, bool>();
-        foreach (string platformId in PlatformRegistry.AllPlatformNameKeys)
-        {
-            platformChecks[platformId] = settings.HasPlatform(platformId);
-        }
+        settings.EnsureOpenAIPlatform();
+        PlatformCredential cred = settings.GetCredential(OpenAICompatibleTranslate.PlatformNameKey);
 
         try
         {
@@ -90,57 +83,26 @@ public class AutoTranslatorMod : Mod
             {
                 AutoTranslatorEngine.OpenAutoXml();
             }
-
-            // 平台勾选区
-            listing.Gap(12f);
-            Title.Draw(listing, TranslateKeys.PlatformList.Translate());
-
-            foreach (string platformId in PlatformRegistry.AllPlatformNameKeys)
+            if (listing.ButtonText(TranslateKeys.ClearTranslationCache.Translate()))
             {
-                bool enabled = platformChecks[platformId];
-                listing.CheckboxLabeled(PlatformRegistry.LabelKeys[platformId].Translate(), ref enabled);
-                platformChecks[platformId] = enabled;
+                Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation(
+                    TranslateKeys.ConfirmClearTranslationCache.Translate(),
+                    AutoTranslatorEngine.ClearTranslationCache));
             }
 
-            // 凭据折叠区：每行两行 TextEntryLabeled（访问键 / 密钥）
+            // OpenAI 兼容接口
             listing.Gap(12f);
-            DrawCollapsibleHeader(listing, TranslateKeys.CredentialTable.Translate());
-            if (!settings.credentialsCollapsed)
-            {
-                foreach (PlatformCredential cred in settings.credentials.Where(c => c.enabled))
-                {
-                    listing.Gap(8f);
-                    string platformLabel = PlatformRegistry.LabelKeys.TryGetValue(cred.PlatformId, out string key)
-                        ? key.Translate()
-                        : cred.PlatformId;
-                    listing.Label(platformLabel);
-
-                    if (cred.PlatformId == OpenAICompatibleTranslate.PlatformNameKey)
-                    {
-                        cred.ApiBaseUrl = listing.TextEntryLabeled(TranslateKeys.ApiBaseUrl.Translate(), cred.ApiBaseUrl ?? string.Empty);
-                        cred.Model = listing.TextEntryLabeled(TranslateKeys.Model.Translate(), cred.Model ?? string.Empty);
-                        cred.AccessKey = DrawPasswordField(
-                            listing, TranslateKeys.ApiKey.Translate(), cred.AccessKey, ref cred.showAccessKey);
-                        listing.Gap(6f);
-                        DrawCredentialActionButtons(listing, cred);
-                        continue;
-                    }
-
-                    // 访问键：真实值存 cred.AccessKey（label 字段，隐藏），输入框打码/明文可切换，改后同步写回。
-                    cred.AccessKey = DrawPasswordField(
-                        listing, platformLabel + " · " + TranslateKeys.AccessKey.Translate(), cred.AccessKey, ref cred.showAccessKey);
-
-                    // 密钥：同上
-                    cred.SecretKey = DrawPasswordField(
-                        listing, platformLabel + " · " + TranslateKeys.SecretKey.Translate(), cred.SecretKey, ref cred.showSecretKey);
-
-                    // 每个平台独占保存 / 恢复默认按钮，避免只有底部一组时无法对前面的凭据操作。
-                    listing.Gap(6f);
-                    DrawCredentialActionButtons(listing, cred);
-                }
-            }
+            Title.Draw(listing, OpenAICompatibleTranslate.PlatformNameKey.Translate());
+            listing.Gap(8f);
+            cred.ApiBaseUrl = listing.TextEntryLabeled(TranslateKeys.ApiBaseUrl.Translate(), cred.ApiBaseUrl ?? string.Empty);
+            cred.Model = listing.TextEntryLabeled(TranslateKeys.Model.Translate(), cred.Model ?? string.Empty);
+            cred.AccessKey = DrawPasswordField(
+                listing, TranslateKeys.ApiKey.Translate(), cred.AccessKey, ref cred.showAccessKey);
+            listing.Gap(6f);
+            DrawCredentialActionButtons(listing, cred);
 
             listing.Gap(12f);
+            settingsContentHeight = listing.CurHeight + 16f;
             listing.End();
             Widgets.EndScrollView();
         }
@@ -149,30 +111,6 @@ public class AutoTranslatorMod : Mod
             AutoLog.Error("[AutoTranslator] DoSettingsWindowContents 异常: " + ex);
         }
 
-        // listing 渲染完后再同步平台勾选状态到凭据列表（避开 repaint 期间增删集合）。
-        bool platformChanged = false;
-        foreach (KeyValuePair<string, bool> kv in platformChecks)
-        {
-            bool current = settings.HasPlatform(kv.Key);
-            if (current != kv.Value)
-            {
-                platformChanged = true;
-            }
-            if (kv.Value)
-            {
-                settings.EnablePlatform(kv.Key);
-            }
-            else
-            {
-                settings.DisablePlatform(kv.Key);
-            }
-        }
-
-        // 平台勾选变化即时刷新引擎（启用/禁用某个翻译源立即生效，无需点保存）。
-        if (platformChanged)
-        {
-            AutoTranslatorEngine.RefreshSources();
-        }
     }
 
     /// <summary>绘制单个凭据的保存 / 恢复默认按钮，居中并排。</summary>
@@ -200,32 +138,6 @@ public class AutoTranslatorMod : Mod
             AutoTranslatorEngine.RefreshSources();
             SoundDefOf.Tick_Low.PlayOneShot(SoundInfo.OnCamera(MaintenanceType.None));
         }
-    }
-
-    /// <summary>绘制加粗放大的可折叠 section 标题，左侧 ▶/▼ 三角形指示折叠状态，可点击切换。</summary>
-    private void DrawCollapsibleHeader(Listing_Standard listing, string text)
-    {
-        const float TriangleWidth = 24f;
-        const float HeaderHeight = 30f;
-        Rect rect = listing.GetRect(HeaderHeight);
-        GameFont previous = Text.Font;
-        Text.Font = GameFont.Medium;
-        try
-        {
-            Rect triangleRect = new Rect(rect.x, rect.y + (rect.height - TriangleWidth) / 2f, TriangleWidth, TriangleWidth);
-            if (Widgets.ButtonImage(triangleRect, settings.credentialsCollapsed ? TexButton.Reveal : TexButton.Collapse))
-            {
-                settings.credentialsCollapsed = !settings.credentialsCollapsed;
-            }
-
-            Rect textRect = new Rect(rect.x + TriangleWidth + 6f, rect.y, rect.width - TriangleWidth - 6f, rect.height);
-            Widgets.Label(textRect, text);
-        }
-        finally
-        {
-            Text.Font = previous;
-        }
-        listing.Gap(4f);
     }
 
     /// <summary>

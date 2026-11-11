@@ -16,3 +16,6 @@ Extends/
 
 # IDE
 .vs/
+
+# Test runner output
+Source/**/TestResults/

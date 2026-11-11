@@ -17,14 +17,6 @@ internal static class TranslationPatch
     /// <summary>拦截官方 TryTranslate：查本模组是否已翻译，已译则回写译文直接返回；否则记录并提交实时翻译。</summary>
     private static void Postfix(string key, ref TaggedString result, bool __result)
     {
-        // 开发模式（DevMode）下整条自动翻译链路不介入：不记录、不实时翻译、也不回写历史译文，
-        // 表现等同「未安装本模组翻译」。原因：① 开发机不应写真实翻译产物到 auto.xml；
-        // ② DevMode 下各种边界（伪翻译、重复重试等）逻辑纠缠，整链路跳过最清晰、最省心，
-        // 避免开发环境误刷翻译接口。
-        if (Prefs.DevMode)
-        {
-            return;
-        }
         // 总开关关闭则不拦截。
         if (!AutoTranslatorMod.AutoTranslateEnabled 
         || String.IsNullOrWhiteSpace(key) 
@@ -71,6 +63,20 @@ internal static class TranslationPatch
 
         // 记录 key 与原文（受 enableTranslationLog 开关，Store 内部 Writable 控制是否落盘）。
         AutoTranslationStore.RecordSource(key, source);
+
+        string target = LanguageDatabase.activeLanguage.folderName;
+        AutoTranslatorEngine.EnsureSourceCacheLoaded(target);
+        if (SourceTranslationCache.TryGet(target, source, out string reusable))
+        {
+            result = reusable;
+            LanguageDatabase.activeLanguage.keyedReplacements[key] = new LoadedLanguage.KeyedReplacement
+            {
+                key = key,
+                value = reusable,
+            };
+            AutoTranslationStore.RecordTranslation(key, reusable);
+            return;
+        }
 
         // 启用实时翻译则提交引擎异步翻译并回写。
         if (AutoTranslatorMod.RealtimeUpdateEnabled)

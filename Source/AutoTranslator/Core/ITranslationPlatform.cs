@@ -7,7 +7,7 @@ namespace nomadicooer.AutoTranslator;
 /// </summary>
 public interface ITranslationPlatform
 {
-    /// <summary>平台标识（带前缀的完整标志，如 "AutoTranslator.Volcengine"）。</summary>
+    /// <summary>平台标识（带前缀的完整标志）。</summary>
     string PlatformName { get; }
 
     /// <summary>

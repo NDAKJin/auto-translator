@@ -5,7 +5,7 @@ using System.Threading;
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>
-/// 翻译调度器：协调多个翻译源（阿里云/百度/火山等）。
+/// 翻译调度器：协调翻译请求与接口状态。
 /// 统一负责节流与限流重试，并根据各翻译源返回的 TranslationResult 错误码，
 /// 对连续失败的源实施"关禁闭"（冷却）策略。
 /// 各翻译源类只负责发起请求并返回结果，不含任何节流/重试逻辑。
@@ -120,7 +120,7 @@ public class TranslationDispatcher : ITranslationPlatform
     {
         if (_sources.Count == 0)
         {
-            AutoLog.Error("[AutoTranslator] 翻译调度器未注册任何翻译源，无法执行翻译。请检查 Mod 设置中是否已启用并正确配置至少一个翻译源（如火山/阿里云/百度）的 API Key。");
+            AutoLog.Error("[AutoTranslator] 翻译调度器未注册翻译源，请检查 Mod 设置中的 API 地址、模型和 API Key。");
             return TranslationResult.Fail(text, TranslationErrorCode.InvalidRequest, "翻译调度器无可用翻译源");
         }
 
@@ -177,6 +177,7 @@ public class TranslationDispatcher : ITranslationPlatform
             AutoLog.Warn("[AutoTranslator] 翻译源 " + platform.PlatformName
                             + " 限流，第 " + retry + " 次重试，等待 " + backoff + "ms。");
             Thread.Sleep(backoff);
+            EnsureMinInterval(platform);
             result = platform.Translate(source, target, text);
             TranslateStats.RecordCall(platform.PlatformName, result.Success);
         }
@@ -194,18 +195,19 @@ public class TranslationDispatcher : ITranslationPlatform
             return;
         }
 
-        long now = DateTime.UtcNow.Ticks;
-        long last;
+        long waitTicks;
         lock (_stateLock)
         {
-            _lastRequestTicks.TryGetValue(platform, out last);
-            _lastRequestTicks[platform] = now;
+            long now = DateTime.UtcNow.Ticks;
+            _lastRequestTicks.TryGetValue(platform, out long last);
+            long scheduled = Math.Max(now, last + MinIntervalMs * TimeSpan.TicksPerMillisecond);
+            _lastRequestTicks[platform] = scheduled;
+            waitTicks = scheduled - now;
         }
 
-        long elapsedMs = (now - last) / TimeSpan.TicksPerMillisecond;
-        if (elapsedMs < MinIntervalMs)
+        if (waitTicks > 0)
         {
-            Thread.Sleep((int)(MinIntervalMs - elapsedMs));
+            Thread.Sleep((int)Math.Ceiling((double)waitTicks / TimeSpan.TicksPerMillisecond));
         }
     }
 

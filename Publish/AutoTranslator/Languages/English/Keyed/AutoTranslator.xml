@@ -8,27 +8,16 @@
   <AutoTranslator.EnableAutoTranslate>Enable dynamic translation</AutoTranslator.EnableAutoTranslate>
   <AutoTranslator.EnableTranslationLog>Enable translation log</AutoTranslator.EnableTranslationLog>
   <AutoTranslator.EnableRealtimeUpdate>Enable realtime translation</AutoTranslator.EnableRealtimeUpdate>
-  <AutoTranslator.VolcengineAccessKey>Volcengine AccessKey</AutoTranslator.VolcengineAccessKey>
-  <AutoTranslator.VolcengineSecretKey>Volcengine SecretKey</AutoTranslator.VolcengineSecretKey>
-  <AutoTranslator.AliyunAccessKeyId>Aliyun AccessKeyId</AutoTranslator.AliyunAccessKeyId>
-  <AutoTranslator.AliyunAccessKeySecret>Aliyun AccessKeySecret</AutoTranslator.AliyunAccessKeySecret>
-  <AutoTranslator.BaiduAppId>Baidu APP ID</AutoTranslator.BaiduAppId>
-  <AutoTranslator.BaiduSecretKey>Baidu SecretKey</AutoTranslator.BaiduSecretKey>
-  <AutoTranslator.Volcengine>Volcengine</AutoTranslator.Volcengine>
-  <AutoTranslator.Baidu>Baidu</AutoTranslator.Baidu>
-  <AutoTranslator.Aliyun>Aliyun</AutoTranslator.Aliyun>
   <AutoTranslator.OpenAICompatible>AI relay (OpenAI compatible)</AutoTranslator.OpenAICompatible>
   <AutoTranslator.ApiBaseUrl>API base URL (/v1)</AutoTranslator.ApiBaseUrl>
   <AutoTranslator.Model>Model</AutoTranslator.Model>
   <AutoTranslator.ApiKey>API Key</AutoTranslator.ApiKey>
-  <AutoTranslator.PlatformList>Available platforms</AutoTranslator.PlatformList>
-  <AutoTranslator.CredentialTable>Credentials</AutoTranslator.CredentialTable>
-  <AutoTranslator.AccessKey>Access key</AutoTranslator.AccessKey>
-  <AutoTranslator.SecretKey>Secret key</AutoTranslator.SecretKey>
   <AutoTranslator.ResetDefaults>Reset to defaults</AutoTranslator.ResetDefaults>
   <AutoTranslator.SaveSettings>Save settings</AutoTranslator.SaveSettings>
   <AutoTranslator.ShowPassword>Show password</AutoTranslator.ShowPassword>
   <AutoTranslator.HidePassword>Hide password</AutoTranslator.HidePassword>
   <AutoTranslator.TranslationFilePathLabel>Translation file path</AutoTranslator.TranslationFilePathLabel>
   <AutoTranslator.OpenXmlFile>Open translation file</AutoTranslator.OpenXmlFile>
+  <AutoTranslator.ClearTranslationCache>Clear all translation records</AutoTranslator.ClearTranslationCache>
+  <AutoTranslator.ConfirmClearTranslationCache>Clear all translation records for the current language and restore the original text? You can translate it again afterward.</AutoTranslator.ConfirmClearTranslationCache>
 </LanguageData>

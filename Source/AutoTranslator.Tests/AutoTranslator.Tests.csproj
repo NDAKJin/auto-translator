@@ -29,6 +29,13 @@
     <Compile Include="..\AutoTranslator\Core\ITranslationPlatform.cs" Link="LinkedSources\ITranslationPlatform.cs" />
     <Compile Include="..\AutoTranslator\Core\TranslatePlatform.cs" Link="LinkedSources\TranslatePlatform.cs" />
     <Compile Include="..\AutoTranslator\Core\OpenAICompatibleTranslate.cs" Link="LinkedSources\OpenAICompatibleTranslate.cs" />
+    <Compile Include="..\AutoTranslator\Core\DefTranslationXml.cs" Link="LinkedSources\DefTranslationXml.cs" />
+    <Compile Include="..\AutoTranslator\Core\VisibleTextFilter.cs" Link="LinkedSources\VisibleTextFilter.cs" />
+    <Compile Include="..\AutoTranslator\Core\TranslationProgress.cs" Link="LinkedSources\TranslationProgress.cs" />
+    <Compile Include="..\AutoTranslator\Core\SourceTranslationCache.cs" Link="LinkedSources\SourceTranslationCache.cs" />
+    <Compile Include="..\AutoTranslator\Core\TranslationFailureTracker.cs" Link="LinkedSources\TranslationFailureTracker.cs" />
+    <Compile Include="..\AutoTranslator\Core\TranslationDispatcher.cs" Link="LinkedSources\TranslationDispatcher.cs" />
+    <Compile Include="..\AutoTranslator\Core\TranslateStats.cs" Link="LinkedSources\TranslateStats.cs" />
   </ItemGroup>
 
 </Project>

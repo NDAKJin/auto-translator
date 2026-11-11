@@ -22,7 +22,7 @@ public static class AutoLog
   public static bool CompactException { get; set; } = true;
 
   // 不依赖 AutoTranslatorGlobals（其依赖 Verse），避免测试工程编译时引入 Verse。
-  private static string Prefix => "[nomadicooer.AutoTranslator] ";
+  private static string Prefix => "[ndakjin.autotranslator] ";
 
   /// <summary>异常描述：按 CompactException 决定输出摘要或全堆栈。</summary>
   private static string Describe(Exception ex)

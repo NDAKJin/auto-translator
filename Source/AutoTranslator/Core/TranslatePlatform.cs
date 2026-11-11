@@ -17,22 +17,17 @@ namespace nomadicooer.AutoTranslator;
 /// </summary>
 public abstract class TranslatePlatform : ITranslationPlatform
 {
-    protected TranslatePlatform(string accessKey, string secretKey)
+    protected TranslatePlatform(string accessKey)
     {
         AccessKey = accessKey;
-        SecretKey = secretKey;
     }
 
     /// <summary>Access Key / APP ID</summary>
     protected string AccessKey { get; }
 
-    /// <summary>Secret Key</summary>
-    protected string SecretKey { get; }
+    protected virtual bool HasCredentials => !string.IsNullOrWhiteSpace(AccessKey);
 
-    /// <summary>多数平台需要双密钥；单 API Key 平台可重写。</summary>
-    protected virtual bool HasCredentials => !string.IsNullOrWhiteSpace(AccessKey) && !string.IsNullOrWhiteSpace(SecretKey);
-
-    /// <summary>平台标识（带前缀的完整标志，如 "AutoTranslator.Baidu"）。</summary>
+    /// <summary>平台标识（带前缀的完整标志）。</summary>
     public abstract string PlatformName { get; }
 
     /// <summary>将 RimWorld 语言名转为平台语言码；不支持时返回 null。</summary>

@@ -14,22 +14,9 @@ public static class TranslateKeys
   public const string EnableAutoTranslate = "AutoTranslator.EnableAutoTranslate";
   public const string EnableTranslationLog = "AutoTranslator.EnableTranslationLog";
   public const string EnableRealtimeUpdate = "AutoTranslator.EnableRealtimeUpdate";
-  public const string VolcengineAccessKey = "AutoTranslator.VolcengineAccessKey";
-  public const string VolcengineSecretKey = "AutoTranslator.VolcengineSecretKey";
-  public const string AliyunAccessKeyId = "AutoTranslator.AliyunAccessKeyId";
-  public const string AliyunAccessKeySecret = "AutoTranslator.AliyunAccessKeySecret";
-  public const string BaiduAppId = "AutoTranslator.BaiduAppId";
-  public const string BaiduSecretKey = "AutoTranslator.BaiduSecretKey";
-  public const string Volcengine = "AutoTranslator.Volcengine";
-  public const string Baidu = "AutoTranslator.Baidu";
-  public const string Aliyun = "AutoTranslator.Aliyun";
   public const string ApiBaseUrl = "AutoTranslator.ApiBaseUrl";
   public const string Model = "AutoTranslator.Model";
   public const string ApiKey = "AutoTranslator.ApiKey";
-  public const string PlatformList = "AutoTranslator.PlatformList";
-  public const string CredentialTable = "AutoTranslator.CredentialTable";
-  public const string AccessKey = "AutoTranslator.AccessKey";
-  public const string SecretKey = "AutoTranslator.SecretKey";
   public const string ResetDefaults = "AutoTranslator.ResetDefaults";
   public const string SaveSettings = "AutoTranslator.SaveSettings";
   public const string ShowPassword = "AutoTranslator.ShowPassword";
@@ -37,4 +24,6 @@ public static class TranslateKeys
   public const string TranslationFilePath = "AutoTranslator.TranslationFilePath";
   public const string TranslationFilePathLabel = "AutoTranslator.TranslationFilePathLabel";
   public const string OpenXmlFile = "AutoTranslator.OpenXmlFile";
+  public const string ClearTranslationCache = "AutoTranslator.ClearTranslationCache";
+  public const string ConfirmClearTranslationCache = "AutoTranslator.ConfirmClearTranslationCache";
 }

@@ -13,7 +13,7 @@ public static class AutoTranslatorGlobals
   public const string TranslationKeyPrefix = "";
 
   /// <summary>本模组 ID。用于 Harmony 补丁 owner、日志标识等。</summary>
-  public const string ModId = "nomadicooer.AutoTranslator";
+  public const string ModId = "ndakjin.autotranslator";
 
   /// <summary>本模组在 mods 根目录下的包文件夹名（与 packageId 末尾一致）。用于定位 mod 包目录。</summary>
   public const string ModPackageDir = "AutoTranslator";

@@ -1,8 +1,7 @@
 namespace nomadicooer.AutoTranslator;
 
 /// <summary>
-/// 翻译平台统一的错误码（跨阿里云/百度/火山一致）。
-/// 各平台返回的平台特定错误码（如阿里云 10005、百度 54003、火山 -429）
+/// 翻译接口统一使用的错误码。
 /// 由各自实现映射到此统一枚举，调用方无需关心具体平台即可按码分支。
 /// </summary>
 public enum TranslationErrorCode

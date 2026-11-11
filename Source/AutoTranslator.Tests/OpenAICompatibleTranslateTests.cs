@@ -35,7 +35,7 @@ public class OpenAICompatibleTranslateTests
     public void SendsChatCompletionAndReadsTranslation()
     {
         var handler = new StubHandler(HttpStatusCode.OK,
-            "{\"choices\":[{\"message\":{\"content\":\"你好 {0}\\n世界\"}}]}");
+            "{\"choices\":[{\"message\":{\"content\":\"{\\\"decision\\\":\\\"成功\\\",\\\"translatedText\\\":\\\"你好 {0}\\\\n世界\\\",\\\"reason\\\":\\\"\\\"}\"}}]}");
         using var client = new HttpClient(handler);
         var platform = new OpenAICompatibleTranslate("test-key", "https://relay.example/v1", "test-model", client);
 
@@ -50,6 +50,7 @@ public class OpenAICompatibleTranslateTests
         JsonElement messages = request.RootElement.GetProperty("messages");
         Assert.Contains("Simplified Chinese", messages[0].GetProperty("content").GetString());
         Assert.Equal("Hello {0}\nworld", messages[1].GetProperty("content").GetString());
+        Assert.Equal("json_object", request.RootElement.GetProperty("response_format").GetProperty("type").GetString());
     }
 
     [Theory]
@@ -86,7 +87,7 @@ public class OpenAICompatibleTranslateTests
     public void RejectsChangedPlaceholders()
     {
         var handler = new StubHandler(HttpStatusCode.OK,
-            "{\"choices\":[{\"message\":{\"content\":\"你好 {1}\"}}]}");
+            "{\"choices\":[{\"message\":{\"content\":\"{\\\"decision\\\":\\\"成功\\\",\\\"translatedText\\\":\\\"你好 {1}\\\",\\\"reason\\\":\\\"\\\"}\"}}]}");
         using var client = new HttpClient(handler);
         var platform = new OpenAICompatibleTranslate("test-key", "https://relay.example/v1", "test-model", client);
 
@@ -94,6 +95,36 @@ public class OpenAICompatibleTranslateTests
 
         Assert.False(result.Success);
         Assert.Equal(TranslationErrorCode.ServiceUnavailable, result.ErrorCode);
+    }
+
+    [Fact]
+    public void AcceptsNotNeededDecisionWithoutWritingTranslation()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK,
+            "{\"choices\":[{\"message\":{\"content\":\"{\\\"decision\\\":\\\"不需翻译\\\",\\\"translatedText\\\":\\\"派系: Redwood Alliance\\\",\\\"reason\\\":\\\"名称和中文说明已完整\\\"}\"}}]}");
+        using var client = new HttpClient(handler);
+        var platform = new OpenAICompatibleTranslate("test-key", "https://relay.example/v1", "test-model", client);
+
+        TranslationResult result = platform.Translate("English", "ChineseSimplified", "派系: Redwood Alliance");
+
+        Assert.True(result.Success);
+        Assert.Equal(TranslationDecision.NotNeeded, result.Decision);
+        Assert.Equal("派系: Redwood Alliance", result.TranslatedText);
+    }
+
+    [Fact]
+    public void RejectsInstructionLikePlainTextResponse()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK,
+            "{\"choices\":[{\"message\":{\"content\":\"请提供需要翻译的英文游戏界面文本\"}}]}");
+        using var client = new HttpClient(handler);
+        var platform = new OpenAICompatibleTranslate("test-key", "https://relay.example/v1", "test-model", client);
+
+        TranslationResult result = platform.Translate("English", "ChineseSimplified", "Launch game");
+
+        Assert.False(result.Success);
+        Assert.Equal(TranslationDecision.Failed, result.Decision);
+        Assert.Contains("JSON", result.RawError);
     }
 
     private sealed class StubHandler : HttpMessageHandler

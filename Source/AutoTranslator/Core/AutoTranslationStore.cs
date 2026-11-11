@@ -364,6 +364,32 @@ public static class AutoTranslationStore
     return LoadXmlFilePath;
   }
 
+  /// <summary>清除当前语言的全部 Keyed 翻译记录（包括界面文本），返回需要从运行时撤回的条目。</summary>
+  public static Dictionary<string, string> ClearCurrentLanguage()
+  {
+    TryLoadIfNeeded();
+    lock (flushLock)
+    {
+      string path = LoadXmlFilePath;
+      if (path == null) return new Dictionary<string, string>();
+      if (File.Exists(path)) File.Delete(path);
+      var timer = Interlocked.Exchange(ref pendingFlushTimer, null);
+      timer?.Dispose();
+      lock (lockObj)
+      {
+        var translated = new Dictionary<string, string>();
+        foreach (TranslationEntry entry in store.Values)
+        {
+          if (entry.Translated) translated[entry.Key] = entry.Translation;
+        }
+        store.Clear();
+        dirtyCount = 0;
+        loaded = true;
+        return translated;
+      }
+    }
+  }
+
   /// <summary>序列化为 RimWorld Keyed 格式 xml，键按字母序稳定输出；经 XmlWriter 自动处理转义。</summary>
   private static string Serialize(Dictionary<string, TranslationEntry> data)
   {
@@ -437,6 +463,34 @@ public static class AutoTranslationStore
         return true;
       }
       return false;
+    }
+  }
+
+  /// <summary>获取已保存的译文，用于识别重新绘制的结果，避免将它当作新原文。</summary>
+  public static List<string> GetSavedTranslations()
+  {
+    TryLoadIfNeeded();
+    lock (lockObj)
+    {
+      var result = new List<string>();
+      foreach (TranslationEntry entry in store.Values)
+      {
+        if (entry.Translated && !string.IsNullOrEmpty(entry.Translation)) result.Add(entry.Translation);
+      }
+      return result;
+    }
+  }
+
+  public static void LoadSourceTranslations(string language)
+  {
+    TryLoadIfNeeded();
+    lock (lockObj)
+    {
+      foreach (TranslationEntry entry in store.Values)
+      {
+        if (entry.Translated && !string.IsNullOrEmpty(entry.Source) && !string.IsNullOrEmpty(entry.Translation))
+          SourceTranslationCache.Remember(language, entry.Source, entry.Translation, entry.Verified);
+      }
     }
   }
 
