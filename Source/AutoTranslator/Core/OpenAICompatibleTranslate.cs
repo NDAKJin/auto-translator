@@ -68,10 +68,10 @@ public class OpenAICompatibleTranslate : TranslatePlatform
             if (response.StatusCode == HttpStatusCode.RequestTimeout)
             {
                 AutoLog.ApiFailure("API 调用超时（HTTP 408）");
-                return TranslationResult.Fail(string.Empty, TranslationErrorCode.ServiceUnavailable, "API 调用超时（HTTP 408）");
+                return TranslationResult.Fail(string.Empty, TranslationErrorCode.ServiceUnavailable, FormatHttpError(response.StatusCode, body));
             }
             if (!response.IsSuccessStatusCode)
-                return TranslationResult.Fail(string.Empty, TranslationErrorCode.InvalidRequest, "HTTP " + (int)response.StatusCode);
+                return TranslationResult.Fail(string.Empty, TranslationErrorCode.InvalidRequest, FormatHttpError(response.StatusCode, body));
             stage = "解析响应";
             ChatResponse result = Deserialize<ChatResponse>(body);
             string content = result?.Choices != null && result.Choices.Length > 0 ? result.Choices[0]?.Message?.Content : null;
@@ -169,13 +169,11 @@ public class OpenAICompatibleTranslate : TranslatePlatform
             if (response.StatusCode == HttpStatusCode.RequestTimeout)
             {
                 AutoLog.ApiFailure("API 调用超时（HTTP 408）");
-                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, "API 调用超时（HTTP 408）");
+                return TranslationResult.Fail(text, TranslationErrorCode.ServiceUnavailable, FormatHttpError(response.StatusCode, body));
             }
             if (!response.IsSuccessStatusCode)
             {
-                string error = ReadError(body);
-                string httpReason = "AI 中转站 HTTP " + (int)response.StatusCode;
-                if (!string.IsNullOrEmpty(error)) httpReason += ": " + error;
+                string httpReason = FormatHttpError(response.StatusCode, body);
                 TranslationErrorCode code = (int)response.StatusCode == 429
                     || response.StatusCode == HttpStatusCode.RequestTimeout
                     || (int)response.StatusCode >= 500
@@ -330,14 +328,25 @@ public class OpenAICompatibleTranslate : TranslatePlatform
         return true;
     }
 
+    private string FormatHttpError(HttpStatusCode status, string body)
+    {
+        string prefix = status == HttpStatusCode.RequestTimeout ? "API 调用超时（HTTP 408）" : "AI 中转站 HTTP " + (int)status;
+        string message = ReadError(body);
+        if (string.IsNullOrWhiteSpace(message)) return prefix;
+        if (!string.IsNullOrWhiteSpace(AccessKey)) message = message.Replace(AccessKey.Trim(), "***");
+        message = Regex.Replace(message, @"[\x00-\x1F\x7F]+", " ").Trim();
+        if (message.Length > 240) message = message.Substring(0, 240) + "...";
+        return prefix + ": " + message;
+    }
+
     private static string ReadError(string body)
     {
         try
         {
             string message = Deserialize<ErrorResponse>(body)?.Error?.Message;
-            return message?.Length > 240 ? message.Substring(0, 240) : message;
+            return message;
         }
-        catch (SerializationException)
+        catch (Exception ex) when (ex is SerializationException || ex is InvalidOperationException || ex is System.Xml.XmlException)
         {
             return null;
         }

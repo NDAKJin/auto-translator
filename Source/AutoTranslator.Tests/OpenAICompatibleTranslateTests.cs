@@ -12,6 +12,31 @@ namespace AutoTranslator.Tests;
 public class OpenAICompatibleTranslateTests
 {
     [Fact]
+    public void HttpErrorsShowProviderMessageWithoutLeakingKey()
+    {
+        using var client = new HttpClient(new StubHandler(HttpStatusCode.Unauthorized, "{\"error\":{\"message\":\"Invalid key test-secret\"}}"));
+        var platform = new OpenAICompatibleTranslate("test-secret", "https://relay.example/v1", "model", client);
+        foreach (var result in new[] { platform.TestConnection(), platform.Translate("English", "ChineseSimplified", "Hello") })
+        {
+            Assert.Contains("401", result.RawError);
+            Assert.Contains("Invalid key ***", result.RawError);
+            Assert.DoesNotContain("test-secret", result.RawError);
+        }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("<html>proxy error</html>")]
+    [InlineData("{\"error\":\"bad request\"}")]
+    public void ConnectionTestPreservesStatusForNonstandardErrors(string body)
+    {
+        using var client = new HttpClient(new StubHandler(HttpStatusCode.BadGateway, body));
+        var result = new OpenAICompatibleTranslate("key", "https://relay.example/v1", "model", client).TestConnection();
+        Assert.False(result.Success);
+        Assert.Contains("502", result.RawError);
+    }
+
+    [Fact]
     public void TimeoutIsReportedForConnectionAndTranslation()
     {
         using var client = new HttpClient(new ThrowingHandler(new TaskCanceledException()));

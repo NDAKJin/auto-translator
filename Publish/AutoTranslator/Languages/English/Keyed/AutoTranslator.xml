@@ -24,4 +24,9 @@
   <AutoTranslator.OpenXmlFile>Open translation file</AutoTranslator.OpenXmlFile>
   <AutoTranslator.ClearTranslationCache>Clear all translation records</AutoTranslator.ClearTranslationCache>
   <AutoTranslator.ConfirmClearTranslationCache>Clear all translation records for the current language and restore the original text? You can translate it again afterward.</AutoTranslator.ConfirmClearTranslationCache>
+  <AutoTranslator.FailedItems>Failed translations</AutoTranslator.FailedItems>
+  <AutoTranslator.FailedItemsEmpty>No failed translations</AutoTranslator.FailedItemsEmpty>
+  <AutoTranslator.RetryFailed>Retry</AutoTranslator.RetryFailed>
+  <AutoTranslator.RetryUnavailable>Enable dynamic and realtime translation first.</AutoTranslator.RetryUnavailable>
+  <AutoTranslator.AbandonFailed>Keep original</AutoTranslator.AbandonFailed>
 </LanguageData>

@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 
 namespace nomadicooer.AutoTranslator;
 
@@ -8,6 +9,7 @@ internal static class VisibleTextFilter
     {
         if (string.IsNullOrWhiteSpace(text) || text.Length > 5000 || string.IsNullOrEmpty(target)) return false;
         if (text.IndexOf("://", StringComparison.Ordinal) >= 0) return false;
+        if (IsTechnicalText(text)) return false;
         if (System.Text.RegularExpressions.Regex.IsMatch(text, @"^\s*[\p{L}\d._-]+\s+v\d+(?:\.\d+)+\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) return false;
 
         int letters = 0;
@@ -26,6 +28,16 @@ internal static class VisibleTextFilter
         // Mixed-language strings are sent to the model too. It decides whether the
         // foreign part is meaningful content or a name/credit that should remain unchanged.
         return letters >= 2 && foreign >= 2;
+    }
+
+    private static bool IsTechnicalText(string text)
+    {
+        string value = text.Trim();
+        if (Regex.IsMatch(value, @"^(?:\(\d+\)\s*)?\[\d{1,2}:\d{2}:\d{2}\]\s+")) return true;
+        if (Regex.IsMatch(value, @"^(?:at\s+|\(wrapper\s+)[\w.<>`+]+(?:\s*\(|:)", RegexOptions.IgnoreCase)) return true;
+        if (Regex.IsMatch(value, @"^[A-Za-z]:[\\/][^\r\n]*$") || Regex.IsMatch(value, @"^\\\\[^\s\\]+\\[^\r\n]+$")) return true;
+        if (Regex.IsMatch(value, @"^(?:[\w.-]+[/\\])+[\w. -]+\.(?:dll|xml|json|cs|log|png|jpg|txt)$", RegexOptions.IgnoreCase)) return true;
+        return false;
     }
 
     public static string GuessSource(string text)

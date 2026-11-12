@@ -448,6 +448,8 @@ public static class AutoTranslatorEngine
 
     private static TranslationResult TranslateShared(TranslationDispatcher dispatcher, string from, string target, string source, int generation)
     {
+        if (failureTracker.IsExhausted(target, source))
+            return TranslationResult.Fail(source, TranslationErrorCode.ServiceUnavailable, "失败次数达到上限");
         if (SourceTranslationCache.TryGet(target, source, out string cached))
             return TranslationResult.Ok(cached);
         string requestKey = generation + "\0" + target + "\0" + source;
@@ -462,11 +464,10 @@ public static class AutoTranslatorEngine
                 {
                     if (failureTracker.Record(target, source) < TranslationFailureTracker.Limit) return result;
                     AutoLog.Warn("同一文本翻译失败 3 次，保持原文并停止重试。");
-                    string unchanged = SourceTranslationCache.Remember(target, source, source);
-                    return unchanged == source ? TranslationResult.NotNeeded(source, "失败次数达到上限")
-                        : TranslationResult.Ok(unchanged);
+                    return result;
                 }
                 string value = result.Decision == TranslationDecision.NotNeeded ? source : result.TranslatedText;
+                failureTracker.Remove(target, source);
                 if (string.IsNullOrEmpty(value)) return result;
                 string chosen = SourceTranslationCache.Remember(target, source, value);
                 return result.Decision == TranslationDecision.NotNeeded && chosen == source
@@ -476,6 +477,10 @@ public static class AutoTranslatorEngine
         try { return request.Value; }
         finally { ((ICollection<KeyValuePair<string, Lazy<TranslationResult>>>)sharedRequests).Remove(new KeyValuePair<string, Lazy<TranslationResult>>(requestKey, request)); }
     }
+
+    internal static List<string> FailedItems(string target) => failureTracker.List(target);
+    internal static void ResetFailure(string target, string source) => failureTracker.Remove(target, source);
+    internal static bool IsFailed(string target, string source) => failureTracker.IsExhausted(target, source);
 
     /// <summary>清除当前语言的全部翻译记录和运行时译文：Keyed、界面文本、Def 记录、Def 注入及内存缓存。</summary>
     public static void ClearTranslationCache()

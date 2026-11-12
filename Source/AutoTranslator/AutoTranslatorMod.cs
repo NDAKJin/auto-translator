@@ -20,7 +20,7 @@ public class AutoTranslatorMod : Mod
     public static bool AutoTranslateEnabled => Instance?.settings.enableAutoTranslate ?? true;
 
     /// <summary>是否启用实时翻译。开启即边拦截边异步调 API 翻译并回写 keyedReplacements；关闭仅记录 key。</summary>
-    public static bool RealtimeUpdateEnabled => Instance?.settings.enableRealtimeUpdate ?? false;
+    public static bool RealtimeUpdateEnabled => Instance?.settings.enableRealtimeUpdate ?? true;
 
     /// <summary>模组设置实例（供引擎/启动初始化读取凭据）。</summary>
     public static AutoTranslatorSettings Settings => Instance?.settings;
@@ -92,6 +92,8 @@ public class AutoTranslatorMod : Mod
                     TranslateKeys.ConfirmClearTranslationCache.Translate(),
                     AutoTranslatorEngine.ClearTranslationCache));
             }
+            if (listing.ButtonText(TranslateKeys.FailedItems.Translate()))
+                Find.WindowStack.Add(new FailedTranslationWindow());
 
             // OpenAI 兼容接口
             listing.Gap(12f);

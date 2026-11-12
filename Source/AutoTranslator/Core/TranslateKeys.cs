@@ -30,4 +30,9 @@ public static class TranslateKeys
   public const string OpenXmlFile = "AutoTranslator.OpenXmlFile";
   public const string ClearTranslationCache = "AutoTranslator.ClearTranslationCache";
   public const string ConfirmClearTranslationCache = "AutoTranslator.ConfirmClearTranslationCache";
+  public const string FailedItems = "AutoTranslator.FailedItems";
+  public const string FailedItemsEmpty = "AutoTranslator.FailedItemsEmpty";
+  public const string RetryFailed = "AutoTranslator.RetryFailed";
+  public const string RetryUnavailable = "AutoTranslator.RetryUnavailable";
+  public const string AbandonFailed = "AutoTranslator.AbandonFailed";
 }

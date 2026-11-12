@@ -34,7 +34,7 @@ internal static class VisibleTextPatch
 
     private static void Prefix(object[] __args)
     {
-        if (TranslationProgress.Drawing) return;
+        if (TranslationProgress.Drawing || LogWindowCaptureGuard.IsDrawing) return;
         if (!seen)
         {
             seen = true;
@@ -57,6 +57,28 @@ internal static class VisibleTextPatch
             }
         }
     }
+}
+
+internal static class LogWindowCaptureGuard
+{
+    [System.ThreadStatic] private static int depth;
+    public static bool IsDrawing => depth > 0;
+    public static void Enter() => depth++;
+    public static void Exit() { if (depth > 0) depth--; }
+}
+
+[HarmonyPatch]
+internal static class LogWindowCapturePatch
+{
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        var type = AccessTools.TypeByName("LudeonTK.EditWindow_Log");
+        var method = type == null ? null : AccessTools.DeclaredMethod(type, "DoWindowContents");
+        if (method != null) yield return method;
+    }
+
+    private static void Prefix() => LogWindowCaptureGuard.Enter();
+    private static void Finalizer() => LogWindowCaptureGuard.Exit();
 }
 
 [HarmonyPatch]

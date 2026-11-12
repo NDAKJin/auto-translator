@@ -24,4 +24,9 @@
   <AutoTranslator.OpenXmlFile>打开翻译文件</AutoTranslator.OpenXmlFile>
   <AutoTranslator.ClearTranslationCache>清除全部翻译记录</AutoTranslator.ClearTranslationCache>
   <AutoTranslator.ConfirmClearTranslationCache>清除当前语言的全部翻译记录并恢复原文吗？清除后可重新翻译。</AutoTranslator.ConfirmClearTranslationCache>
+  <AutoTranslator.FailedItems>失败项</AutoTranslator.FailedItems>
+  <AutoTranslator.FailedItemsEmpty>当前没有失败项</AutoTranslator.FailedItemsEmpty>
+  <AutoTranslator.RetryFailed>重试</AutoTranslator.RetryFailed>
+  <AutoTranslator.RetryUnavailable>请先开启动态翻译和实时翻译。</AutoTranslator.RetryUnavailable>
+  <AutoTranslator.AbandonFailed>保持原文</AutoTranslator.AbandonFailed>
 </LanguageData>

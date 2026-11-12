@@ -39,6 +39,7 @@ internal static class VisibleTextTranslations
         }
         if (string.IsNullOrWhiteSpace(source)) return source;
         AutoTranslatorEngine.EnsureSourceCacheLoaded(target);
+        if (AutoTranslatorEngine.IsFailed(target, source)) return source;
         if (SourceTranslationCache.TryGet(target, source, out string cached))
         {
             Remember(source, cached);
@@ -81,6 +82,25 @@ internal static class VisibleTextTranslations
             })) nextAttempt[source] = DateTime.UtcNow.AddMinutes(1);
         }
         return source;
+    }
+
+    internal static bool Retry(string target, string source)
+    {
+        if (!AutoTranslatorMod.AutoTranslateEnabled || !AutoTranslatorMod.RealtimeUpdateEnabled
+            || LanguageDatabase.activeLanguage?.folderName != target) return false;
+        AutoTranslatorEngine.ResetFailure(target, source);
+        nextAttempt.Remove(source);
+        Observe(source);
+        return true;
+    }
+
+    internal static void Abandon(string target, string source)
+    {
+        AutoTranslatorEngine.ResetFailure(target, source);
+        string key = Key(source);
+        AutoTranslationStore.RecordSource(key, source);
+        RememberUnchanged(source);
+        AutoTranslationStore.RecordTranslation(key, source);
     }
 
     private static void Remember(string source, string translated)

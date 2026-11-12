@@ -13,7 +13,7 @@ public class AutoTranslatorSettings : ModSettings
     // 启用翻译记录：为无 key 字符串自动创建 key，并拦截有 key 但未翻译的，落盘到当前语言包 auto.xml
     public bool enableTranslationLog;
     // 启用实时翻译：翻译完成后实时回写到界面/文本
-    public bool enableRealtimeUpdate;
+    public bool enableRealtimeUpdate = true;
 
     /// <summary>保留列表格式以读取旧版本的 OpenAI 凭据。</summary>
     public List<PlatformCredential> credentials = new();
@@ -22,7 +22,7 @@ public class AutoTranslatorSettings : ModSettings
     {
         Scribe_Values.Look(ref enableAutoTranslate, "enableAutoTranslate", true);
         Scribe_Values.Look(ref enableTranslationLog, "enableTranslationLog", false);
-        Scribe_Values.Look(ref enableRealtimeUpdate, "enableRealtimeUpdate", false);
+        Scribe_Values.Look(ref enableRealtimeUpdate, "enableRealtimeUpdate", true);
         Scribe_Collections.Look(ref credentials, "credentials", LookMode.Deep);
         if (Scribe.mode == LoadSaveMode.LoadingVars || Scribe.mode == LoadSaveMode.ResolvingCrossRefs)
         {
@@ -65,7 +65,7 @@ public class AutoTranslatorSettings : ModSettings
         credentials.Clear();
         enableAutoTranslate = true;
         enableTranslationLog = false;
-        enableRealtimeUpdate = false;
+        enableRealtimeUpdate = true;
         EnsureOpenAIPlatform();
         AutoLog.Enabled = false;
         AutoTranslationStore.SetTranslationLogEnabled(false);
